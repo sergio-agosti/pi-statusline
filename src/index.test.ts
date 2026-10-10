@@ -600,7 +600,14 @@ describe("core lines", () => {
 			tokens: 14200,
 		});
 
-		expect(renderWith(built, statuses).lines[0]).toContain("7% 14k/200k");
+		const { lines, theme } = renderWith(built, statuses);
+		expect(lines[0]).toContain("7%·14k/200k");
+		// The used count reads with the percentage, in the bar's colour; the dot
+		// and the window size stay dim.
+		const tokenOf = (text: string) => theme.calls.find((call) => call.text === text)?.token;
+		expect(tokenOf("14k")).toBe("syntaxString");
+		expect(tokenOf("·")).toBe("dim");
+		expect(tokenOf("/200k")).toBe("dim");
 	});
 
 	it("shows only the percentage when the token count is unknown", () => {

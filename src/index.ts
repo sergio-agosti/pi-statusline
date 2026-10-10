@@ -348,7 +348,9 @@ function renderContextBar(
 		theme.fg(barToken, " " + Math.round(percent) + "%") +
 		// Unknown right after compaction, until the next response reports usage.
 		(usage?.tokens != null
-			? theme.fg("dim", " " + formatTokens(usage.tokens) + "/" + formatTokens(contextWindow))
+			? theme.fg("dim", "·") +
+				theme.fg(barToken, formatTokens(usage.tokens)) +
+				theme.fg("dim", "/" + formatTokens(contextWindow))
 			: "")
 	);
 }
