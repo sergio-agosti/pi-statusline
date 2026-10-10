@@ -8,11 +8,18 @@
  * indicator, and anything else an extension publishes. This extension keeps
  * pi-deck's two-line layout and adds the status line back underneath it.
  *
- *   line 1   model | dir | branch | worktree            [context bar] ◐ thinking
+ *   line 1   model | dir | branch | worktree       [context bar ╊] ◐ thinking
  *   line 2                              ↑in ↓out Rcache Wcache $cost 45%/200k
- *   line 3   160.0k ◆  5h: 85%/93% (2h) · wk: 12% (3d)
+ *   line 3   5h ━━╸───── 34% ↺ 2h·19m  │  7d ━━━━━━╸─ 85% ↺ 3d
  *
  * Line 3 appears only when at least one extension has set a status.
+ *
+ * Extensions that publish a structured feed on `pi.events` — pi-token-count and
+ * pi-quotas — get their data drawn rather than printed: the dumb-zone threshold
+ * becomes a tick on the context bar, and quota windows become chips. Their
+ * status text is suppressed, since it carries the same data in a second format.
+ * Both are progressive: with no feed the status text renders verbatim, and the
+ * whole thing can be turned off with `structuredFeeds: false`.
  */
 
 import type {
@@ -25,10 +32,24 @@ import type {
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import {
 	buildStatusLine,
+	chipBar,
 	collectUsageTotals,
+	contextBarSegments,
 	formatTokens,
+	sanitizeInlineText,
 	type UsageTotals,
 } from "./format.ts";
+import {
+	CONTEXT_TOKENS_UPDATED_EVENT,
+	QUOTAS_USAGE_UPDATED_EVENT,
+	parseContextFeed,
+	parseQuotasFeed,
+	type ContextFeed,
+	type ContextTokenSeverity,
+	type QuotaFeedWindow,
+	type QuotaSeverity,
+	type QuotasFeed,
+} from "./feed.ts";
 import { orderStatusEntries, readSettings, type StatuslineSettings } from "./settings.ts";
 import { getWorktreeLabel, invalidateWorktreeCache } from "./worktree.ts";
 
@@ -52,6 +73,26 @@ const THINKING_COLORS: Record<string, ThemeColor> = {
 };
 
 const CONTEXT_BAR_WIDTH = 12;
+const QUOTA_BAR_WIDTH = 8;
+const CHIP_SEPARATOR = "  │  ";
+
+/**
+ * pi-token-count owns the dumb-zone thresholds, so its verdict is used as given
+ * rather than re-derived from the percentage.
+ */
+const CONTEXT_SEVERITY_COLORS: Record<ContextTokenSeverity, ThemeColor> = {
+	normal: "syntaxString",
+	warning: "warning",
+	dumb: "error",
+};
+
+/** Mirrors pi-quotas' own getSeverityColor. */
+const QUOTA_SEVERITY_COLORS: Record<QuotaSeverity, ThemeColor> = {
+	none: "success",
+	warning: "warning",
+	high: "error",
+	critical: "error",
+};
 
 /**
  * Cumulative usage memo.
@@ -67,13 +108,41 @@ interface StatsCache {
 	totals: UsageTotals;
 }
 
+/** Latest payload from each feed, held across footer installs. */
+interface Feeds {
+	context?: ContextFeed;
+	quotas?: QuotasFeed;
+}
+
 export default function piStatusline(pi: ExtensionAPI) {
+	// Subscribed for the life of the instance rather than per footer, so a footer
+	// installed after the last feed event — a session switch or a `/reload`
+	// re-renders without re-running this factory — draws the latest data
+	// immediately instead of waiting out a refresh interval.
+	const feeds: Feeds = {};
+	let requestRender: (() => void) | undefined;
+
+	pi.events.on(CONTEXT_TOKENS_UPDATED_EVENT, (data) => {
+		const feed = parseContextFeed(data);
+		if (!feed) return;
+		feeds.context = feed;
+		requestRender?.();
+	});
+
+	pi.events.on(QUOTAS_USAGE_UPDATED_EVENT, (data) => {
+		const feed = parseQuotasFeed(data);
+		if (!feed) return;
+		feeds.quotas = feed;
+		requestRender?.();
+	});
+
 	pi.on("session_start", (_event, ctx) => {
 		ctx.ui.setFooter((tui, theme, footerData) => {
 			// Settings are read once when the footer is installed; `/reload` or a
 			// new session picks up changes.
-			const settings = readSettings(ctx.cwd);
+			const settings = readSettings(getCwd(ctx));
 			let statsCache: StatsCache | undefined;
+			requestRender = () => tui.requestRender();
 
 			const unsubscribe = footerData.onBranchChange(() => {
 				// A branch change is the best available signal that worktrees may
@@ -104,7 +173,10 @@ export default function piStatusline(pi: ExtensionAPI) {
 			}
 
 			return {
-				dispose: unsubscribe,
+				dispose() {
+					requestRender = undefined;
+					unsubscribe();
+				},
 				invalidate() {},
 				render(width: number): string[] {
 					// The footer's context resolves its values lazily through getters
@@ -120,11 +192,15 @@ export default function piStatusline(pi: ExtensionAPI) {
 			};
 
 			function renderFrame(width: number): string[] {
-				const lines = [renderIdentityLine(theme, footerData, ctx, width)];
+				const contextFeed = applicableContextFeed(ctx, feeds.context, settings);
+
+				const lines = [
+					renderIdentityLine(theme, footerData, ctx, width, contextFeed),
+				];
 
 				const statusLine =
 					settings.statusLine && width > 0
-						? renderStatusLine(theme, footerData, settings, width)
+						? renderStatusLine(theme, footerData, settings, feeds, contextFeed, width)
 						: undefined;
 
 				if (statusLine && settings.position === "top") lines.push(statusLine);
@@ -143,6 +219,7 @@ function renderIdentityLine(
 	footerData: ReadonlyFooterDataProvider,
 	ctx: ExtensionContext,
 	width: number,
+	contextFeed: ContextFeed | undefined,
 ): string {
 	const c = (token: ThemeColor, text: string) => theme.fg(token, text);
 
@@ -163,7 +240,7 @@ function renderIdentityLine(
 			? ""
 			: theme.fg(THINKING_COLORS[thinkingLevel] ?? "dim", "◐ " + thinkingLevel);
 
-	const right = [renderContextBar(theme, ctx), thinking]
+	const right = [renderContextBar(theme, ctx, contextFeed), thinking]
 		.filter(Boolean)
 		.join(theme.fg("dim", "  "));
 
@@ -174,21 +251,48 @@ function renderIdentityLine(
 	return truncateToWidth(leftText + padding + right, width);
 }
 
-/** Context progress bar, coloured by how full the window is. */
-function renderContextBar(theme: Theme, ctx: ExtensionContext): string {
-	const contextUsage = ctx.getContextUsage();
-	const contextWindow = contextUsage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
+/**
+ * Context progress bar, with the dumb-zone threshold ticked onto it.
+ *
+ * The fill is the used fraction and the tick marks where the dumb zone starts,
+ * both measured against the same window, so the two are directly comparable.
+ * Colour comes from pi-token-count's verdict when it is available, and from
+ * absolute fullness otherwise.
+ */
+function renderContextBar(
+	theme: Theme,
+	ctx: ExtensionContext,
+	contextFeed: ContextFeed | undefined,
+): string {
+	const contextWindow = contextWindowOf(ctx);
 	if (contextWindow <= 0) return "";
 
-	const percent = contextUsage?.percent ?? 0;
-	const filled = Math.round(Math.min(1, percent / 100) * CONTEXT_BAR_WIDTH);
-	const bar = "━".repeat(filled) + "─".repeat(CONTEXT_BAR_WIDTH - filled);
-	const barToken = percent >= 90 ? "error" : percent >= 70 ? "warning" : "syntaxString";
+	const percent = ctx.getContextUsage()?.percent ?? 0;
+	const segments = contextBarSegments(
+		Math.min(1, percent / 100),
+		CONTEXT_BAR_WIDTH,
+		contextFeed
+			? { start: contextFeed.dumbZoneStart, window: contextWindow }
+			: undefined,
+	);
+
+	const barToken: ThemeColor = contextFeed
+		? CONTEXT_SEVERITY_COLORS[contextFeed.severity]
+		: percent >= 90
+			? "error"
+			: percent >= 70
+				? "warning"
+				: "syntaxString";
+
+	const bar =
+		theme.fg(barToken, segments.before) +
+		(segments.tick ? theme.fg("dim", segments.tick) : "") +
+		theme.fg(barToken, segments.after);
 
 	return (
 		theme.fg("syntaxString", ICONS.context + " ") +
-		theme.fg(barToken, bar) +
-		theme.fg("syntaxString", " " + Math.round(percent) + "%")
+		bar +
+		theme.fg(barToken, " " + Math.round(percent) + "%")
 	);
 }
 
@@ -206,9 +310,8 @@ function renderStatsLine(
 	if (totals.cacheWrite) parts.push("W" + formatTokens(totals.cacheWrite));
 	if (totals.cost) parts.push("$" + totals.cost.toFixed(3));
 
-	const contextUsage = ctx.getContextUsage();
-	const contextWindow = contextUsage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
-	const percent = contextUsage?.percent;
+	const contextWindow = contextWindowOf(ctx);
+	const percent = ctx.getContextUsage()?.percent;
 	const contextText = `${percent != null ? percent.toFixed(1) : "?"}%/${formatTokens(contextWindow)}`;
 	const contextColored =
 		percent != null && percent > 90
@@ -225,21 +328,107 @@ function renderStatsLine(
 	return truncateToWidth(theme.fg("dim", padding) + theme.fg("dim", stats), width);
 }
 
-/** The extension status line, or `undefined` when nothing has published a status. */
+/**
+ * The status line, or `undefined` when nothing has published a status.
+ *
+ * Quota chips lead the line, then every remaining status verbatim. A status the
+ * feeds supersede is dropped, so the same data is not printed twice in two
+ * formats.
+ */
 function renderStatusLine(
 	theme: Theme,
 	footerData: ReadonlyFooterDataProvider,
 	settings: StatuslineSettings,
+	feeds: Feeds,
+	contextFeed: ContextFeed | undefined,
 	width: number,
 ): string | undefined {
+	const superseded = new Set<string>();
+	if (contextFeed) superseded.add(contextFeed.statusKey);
+
+	const chips = renderQuotaChips(theme, settings, feeds.quotas, superseded);
 	const entries = orderStatusEntries(footerData.getExtensionStatuses(), settings.order);
+
 	return buildStatusLine({
 		entries,
-		hide: settings.hide,
+		hide: [...settings.hide, ...superseded],
 		separator: theme.fg("dim", settings.separator),
 		width,
 		ellipsis: theme.fg("dim", "..."),
+		prefix: chips,
 	});
+}
+
+/**
+ * The quota windows as chips, or `undefined` when there are none to draw.
+ *
+ * Records the superseded status key only when it actually renders chips, so a
+ * feed that is present but empty leaves the raw status visible.
+ */
+function renderQuotaChips(
+	theme: Theme,
+	settings: StatuslineSettings,
+	quotas: QuotasFeed | undefined,
+	superseded: Set<string>,
+): string | undefined {
+	if (!settings.structuredFeeds || !quotas || quotas.windows.length === 0) {
+		return undefined;
+	}
+
+	superseded.add(quotas.statusKey);
+	const chips = quotas.windows.map((window) => renderQuotaChip(theme, window));
+	return chips.join(theme.fg("dim", CHIP_SEPARATOR));
+}
+
+/**
+ * One quota window: `5h ━━╸───── 34% ↺ 2h·19m`.
+ *
+ * The value text and reset suffix are published pre-formatted by pi-quotas, so
+ * this only places them. A bar is drawn only where the owning extension said
+ * one is meaningful — a count pair or a currency pair prints a value a bar
+ * would contradict.
+ */
+function renderQuotaChip(theme: Theme, window: QuotaFeedWindow): string {
+	const color = QUOTA_SEVERITY_COLORS[window.severity];
+	const atRisk = window.severity !== "none";
+
+	let chip = theme.fg(atRisk ? color : "dim", sanitizeInlineText(window.shortLabel));
+	if (window.barPercent !== null) {
+		chip += " " + theme.fg(color, chipBar(window.barPercent / 100, QUOTA_BAR_WIDTH));
+	}
+	chip += " " + theme.fg(color, sanitizeInlineText(window.valueText));
+	if (window.limited) chip += theme.fg("error", " !");
+	// The reset suffix carries its own leading space, matching the footer it
+	// came from.
+	if (window.resetText) chip += theme.fg("dim", sanitizeInlineText(window.resetText));
+
+	return chip;
+}
+
+/**
+ * The context feed, but only when it describes the window being drawn.
+ *
+ * pi-token-count recomputes the dumb-zone threshold per model, so a feed left
+ * over from a previous model would put the tick in the wrong place. Treating it
+ * as absent also keeps the raw context status visible, so the dumb-zone readout
+ * is never lost while the bar cannot show it.
+ */
+function applicableContextFeed(
+	ctx: ExtensionContext,
+	feed: ContextFeed | undefined,
+	settings: StatuslineSettings,
+): ContextFeed | undefined {
+	if (!settings.structuredFeeds || !feed) return undefined;
+	if (!(feed.dumbZoneStart > 0)) return undefined;
+	const contextWindow = contextWindowOf(ctx);
+	if (!(contextWindow > 0) || feed.contextWindow !== contextWindow) return undefined;
+	return feed;
+}
+
+/** Model context window, or 0 when unknown. */
+function contextWindowOf(ctx: ExtensionContext): number {
+	const contextUsage = ctx.getContextUsage();
+	return contextUsage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
 }
 
 /** Session cwd, falling back to the process cwd for a stale context. */

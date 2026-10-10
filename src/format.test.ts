@@ -3,8 +3,11 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import {
 	buildStatusLine,
+	chipBar,
 	collectUsageTotals,
+	contextBarSegments,
 	formatTokens,
+	sanitizeInlineText,
 	sanitizeStatusText,
 } from "./format.ts";
 
@@ -165,5 +168,86 @@ describe("buildStatusLine", () => {
 
 	it("emits nothing for a zero-width footer", () => {
 		expect(buildStatusLine({ ...base, entries: [["a", "x"]], width: 0 })).toBeUndefined();
+	});
+});
+
+describe("buildStatusLine prefix", () => {
+	const base = { hide: [], separator: "  ", width: 120, ellipsis: "..." };
+
+	it("renders the prefix ahead of the entries", () => {
+		expect(buildStatusLine({ ...base, entries: [["a", "x"]], prefix: "P" })).toBe("P  x");
+	});
+
+	it("renders the prefix alone when there are no entries", () => {
+		expect(buildStatusLine({ ...base, entries: [], prefix: "P" })).toBe("P");
+	});
+
+	it("keeps the prefix's own spacing intact", () => {
+		// The chip group spaces its separators deliberately, so the prefix must not
+		// go through the space-collapsing status sanitiser.
+		expect(buildStatusLine({ ...base, entries: [], prefix: "a  │  b" })).toBe("a  │  b");
+	});
+
+	it("still emits nothing when there is neither a prefix nor an entry", () => {
+		expect(buildStatusLine({ ...base, entries: [] })).toBeUndefined();
+	});
+});
+
+describe("contextBarSegments", () => {
+	it("fills the bar and leaves the remainder empty", () => {
+		// Without a tick the whole bar lands in `before`, so it can be coloured as
+		// one unit.
+		expect(contextBarSegments(0.5, 4)).toEqual({ before: "━━──", tick: "", after: "" });
+	});
+
+	it("replaces the cell at the dumb-zone threshold rather than inserting one", () => {
+		// 80% of 12 cells is cell 10, which is also where 160k of 200k falls.
+		expect(contextBarSegments(0.8, 12, { start: 160000, window: 200000 })).toEqual({
+			before: "━━━━━━━━━━",
+			tick: "╊",
+			after: "─",
+		});
+	});
+
+	it("keeps the bar's width when it has a tick", () => {
+		const segments = contextBarSegments(0.2, 12, { start: 1000, window: 2000 });
+		expect(visibleWidth(segments.before + segments.tick + segments.after)).toBe(12);
+	});
+
+	it("omits the tick when the threshold is unknown", () => {
+		expect(contextBarSegments(0.5, 4, { start: 0, window: 200000 }).tick).toBe("");
+		expect(contextBarSegments(0.5, 4, { start: 160000, window: 0 }).tick).toBe("");
+	});
+
+	it("clamps a threshold past the end of the window onto the bar", () => {
+		const segments = contextBarSegments(0, 4, { start: 400000, window: 200000 });
+		expect(segments.before).toBe("───");
+		expect(segments.tick).toBe("╊");
+		expect(segments.after).toBe("");
+	});
+});
+
+describe("chipBar", () => {
+	it("caps the fill so a short bar still reads as a bar", () => {
+		expect(chipBar(0.34, 8)).toBe("━━╸─────");
+		expect(chipBar(0.85, 8)).toBe("━━━━━━╸─");
+	});
+
+	it("rounds the fill down so it never overstates what is left", () => {
+		// 0.99 of 8 is 7.92; rounding up would draw a full bar.
+		expect(chipBar(0.99, 8)).toBe("━━━━━━━╸");
+	});
+
+	it("handles the empty and full ends", () => {
+		expect(chipBar(0, 4)).toBe("────");
+		expect(chipBar(1, 4)).toBe("━━━━");
+	});
+});
+
+describe("sanitizeInlineText", () => {
+	it("strips line breaks without collapsing deliberate spacing", () => {
+		// A chip's reset suffix carries a leading space on purpose.
+		expect(sanitizeInlineText(" ↺ 2h·19m")).toBe(" ↺ 2h·19m");
+		expect(sanitizeInlineText("a\nb\tc")).toBe("a b c");
 	});
 });

@@ -17,6 +17,15 @@ export function formatTokens(count: number): string {
 }
 
 /**
+ * Replace line-breaking characters with spaces, leaving horizontal spacing
+ * alone. For text assembled into a line whose spacing is deliberate — a chip's
+ * reset suffix carries a leading space on purpose.
+ */
+export function sanitizeInlineText(text: string): string {
+	return text.replace(/[\r\n\t]/g, " ");
+}
+
+/**
  * Flatten a status entry onto one line.
  *
  * A status is arbitrary extension-authored text, so a newline or tab in it
@@ -24,10 +33,7 @@ export function formatTokens(count: number): string {
  * Mirrors pi's own footer sanitisation.
  */
 export function sanitizeStatusText(text: string): string {
-	return text
-		.replace(/[\r\n\t]/g, " ")
-		.replace(/ +/g, " ")
-		.trim();
+	return sanitizeInlineText(text).replace(/ +/g, " ").trim();
 }
 
 export interface UsageTotals {
@@ -76,6 +82,73 @@ export function collectUsageTotals(entries: readonly SessionEntry[]): UsageTotal
 	return totals;
 }
 
+/** The glyph marking where the dumb zone starts, from pi-token-count. */
+const DUMB_ZONE_TICK = "╊";
+
+/** A context bar split around the dumb-zone tick so each part can be coloured. */
+export interface ContextBarSegments {
+	before: string;
+	/** The tick glyph, or "" when the dumb zone is unknown. */
+	tick: string;
+	after: string;
+}
+
+function barCells(fillRatio: number, width: number): string[] {
+	const filled = Math.round(Math.max(0, Math.min(1, fillRatio)) * width);
+	return Array.from({ length: width }, (_, index) => (index < filled ? "━" : "─"));
+}
+
+/**
+ * Where the dumb-zone tick sits, as a bar cell index. Clamped to the bar, since
+ * a threshold past the window would otherwise fall off the end.
+ */
+function tickIndexFor(dumbZoneStart: number, contextWindow: number, width: number): number {
+	const ratio = dumbZoneStart / contextWindow;
+	return Math.max(0, Math.min(width - 1, Math.round(ratio * width)));
+}
+
+/**
+ * Bar cells filled to `fillRatio`, with an optional tick marking where the dumb
+ * zone starts.
+ *
+ * The tick replaces the cell at its index rather than being inserted, so the bar
+ * keeps its width and everything after it stays aligned. `dumbZone` is omitted
+ * when the threshold is unknown, which leaves a plain bar.
+ */
+export function contextBarSegments(
+	fillRatio: number,
+	width: number,
+	dumbZone?: { start: number; window: number },
+): ContextBarSegments {
+	const cells = barCells(fillRatio, width);
+	const index =
+		dumbZone && dumbZone.window > 0 && dumbZone.start > 0
+			? tickIndexFor(dumbZone.start, dumbZone.window, width)
+			: undefined;
+
+	if (index === undefined) return { before: cells.join(""), tick: "", after: "" };
+	return {
+		before: cells.slice(0, index).join(""),
+		tick: DUMB_ZONE_TICK,
+		after: cells.slice(index + 1).join(""),
+	};
+}
+
+/**
+ * A quota chip's bar: filled to `fillRatio` with a cap glyph at the fill
+ * boundary, so an almost-empty allowance still reads as a bar rather than as
+ * blank space.
+ *
+ * The fill rounds down, never up, so the bar cannot overstate how much
+ * allowance is left.
+ */
+export function chipBar(fillRatio: number, width: number): string {
+	const filled = Math.floor(Math.max(0, Math.min(1, fillRatio)) * width);
+	if (filled >= width) return "━".repeat(width);
+	if (filled <= 0) return "─".repeat(width);
+	return "━".repeat(filled) + "╸" + "─".repeat(width - filled - 1);
+}
+
 export interface StatusLineOptions {
 	entries: Iterable<[string, string]>;
 	/** Keys to omit. */
@@ -85,6 +158,12 @@ export interface StatusLineOptions {
 	width: number;
 	/** Ellipsis used when the line overflows, already theme-styled. */
 	ellipsis: string;
+	/**
+	 * Rendered ahead of the entries, already theme-styled. Not sanitised: its
+	 * spacing is deliberate, and any foreign text inside it was sanitised where
+	 * it was assembled.
+	 */
+	prefix?: string;
 }
 
 /**
@@ -105,11 +184,12 @@ export function buildStatusLine(options: StatusLineOptions): string | undefined 
 		.map(([, text]) => sanitizeStatusText(text))
 		.filter((text) => text.length > 0);
 
-	if (texts.length === 0) return undefined;
+	const segments = options.prefix ? [options.prefix, ...texts] : texts;
+	if (segments.length === 0) return undefined;
 
 	// Entries carry ANSI codes, so measure and cut on visible width rather than
 	// string length; truncateToWidth keeps escape sequences intact.
-	const line = texts.join(options.separator);
+	const line = segments.join(options.separator);
 	return visibleWidth(line) <= options.width
 		? line
 		: truncateToWidth(line, options.width, options.ellipsis);

@@ -21,6 +21,8 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
 
 const statuslineExtension = (await import("./index.ts")).default;
 
+import { CONTEXT_TOKENS_UPDATED_EVENT, QUOTAS_USAGE_UPDATED_EVENT } from "./feed.ts";
+
 const RED = "\u001b[31m";
 const RESET = "\u001b[0m";
 
@@ -54,6 +56,27 @@ interface FakeSession {
 	leafId: string | null;
 }
 
+/** Minimal stand-in for pi's event bus, so tests can publish feeds. */
+function createFakeEventBus() {
+	const handlers = new Map<string, Array<(data: unknown) => void>>();
+	return {
+		on(channel: string, handler: (data: unknown) => void) {
+			const list = handlers.get(channel) ?? [];
+			list.push(handler);
+			handlers.set(channel, list);
+			return () => {
+				handlers.set(
+					channel,
+					(handlers.get(channel) ?? []).filter((entry) => entry !== handler),
+				);
+			};
+		},
+		emit(channel: string, data: unknown) {
+			for (const handler of handlers.get(channel) ?? []) handler(data);
+		},
+	};
+}
+
 function createContext(options: {
 	session: FakeSession;
 	statuses: Map<string, string>;
@@ -62,7 +85,11 @@ function createContext(options: {
 	contextWindow?: number;
 	modelId?: string;
 	thinkingLevel?: string;
-}): { ctx: ExtensionContext; factory: () => FooterFactory } {
+}): {
+	ctx: ExtensionContext;
+	factory: () => FooterFactory;
+	bus: ReturnType<typeof createFakeEventBus>;
+} {
 	let captured: FooterFactory | undefined;
 
 	const ctx = {
@@ -86,16 +113,19 @@ function createContext(options: {
 		},
 	} as unknown as ExtensionContext;
 
+	const bus = createFakeEventBus();
 	const pi = {
 		on(event: string, handler: (event: unknown, ctx: ExtensionContext) => void) {
 			if (event === "session_start") handler({ type: "session_start", reason: "startup" }, ctx);
 		},
+		events: bus,
 	} as unknown as ExtensionAPI;
 
 	statuslineExtension(pi);
 
 	return {
 		ctx,
+		bus,
 		factory: () => {
 			if (!captured) throw new Error("extension did not register a footer");
 			return captured;
@@ -245,6 +275,172 @@ describe("status line rendering", () => {
 		});
 
 		expect(renderWith(built, statuses).lines).toHaveLength(3);
+	});
+});
+
+describe("structured feeds", () => {
+	const contextFeed = {
+		statusKey: "context-tokens",
+		tokens: 152340,
+		contextWindow: 200000,
+		dumbZoneStart: 160000,
+		severity: "warning",
+	};
+
+	const quotasFeed = {
+		statusKey: "pi-quotas-usage",
+		windows: [
+			{
+				shortLabel: "5h",
+				kind: "hours",
+				valueText: "34%",
+				barPercent: 34,
+				severity: "none",
+				resetText: " ↺ 2h·19m",
+				limited: false,
+			},
+			{
+				shortLabel: "7d",
+				kind: "week",
+				valueText: "85%",
+				barPercent: 85,
+				severity: "warning",
+				resetText: " ↺ 3d",
+				limited: false,
+			},
+		],
+	};
+
+	function build(statuses: Map<string, string>, percent = 80) {
+		return createContext({
+			session: { entries: [], sessionId: "s1", leafId: null },
+			statuses,
+			cwd: workDir,
+			percent,
+		});
+	}
+
+	it("ticks the dumb zone onto the context bar and drops the raw status", () => {
+		const statuses = new Map([["context-tokens", "152,340 tok"]]);
+		const built = build(statuses);
+		built.bus.emit(CONTEXT_TOKENS_UPDATED_EVENT, contextFeed);
+
+		const lines = renderWith(built, statuses).lines;
+
+		// 80% of 12 cells is cell 10, which is also where 160k of 200k falls.
+		expect(lines[0]).toContain("━━━━━━━━━━╊─");
+		expect(lines.join("\n")).not.toContain("152,340 tok");
+		// Nothing left for the status line.
+		expect(lines).toHaveLength(2);
+	});
+
+	it("renders quota windows as chips and drops the raw status", () => {
+		const statuses = new Map([["pi-quotas-usage", "5h: 34% · 7d: 85%"]]);
+		const built = build(statuses);
+		built.bus.emit(QUOTAS_USAGE_UPDATED_EVENT, quotasFeed);
+
+		const line = renderWith(built, statuses).lines[2];
+
+		expect(line).toContain("5h");
+		expect(line).toContain("━━╸─────");
+		expect(line).toContain("34%");
+		expect(line).toContain(" ↺ 2h·19m");
+		expect(line).toContain("│");
+		expect(line).toContain("━━━━━━╸─");
+		expect(line).not.toContain("5h: 34%");
+	});
+
+	it("keeps other extensions' statuses alongside the chips", () => {
+		const statuses = new Map([
+			["pi-quotas-usage", "5h: 34%"],
+			["other", "hello"],
+		]);
+		const built = build(statuses);
+		built.bus.emit(QUOTAS_USAGE_UPDATED_EVENT, quotasFeed);
+
+		const line = renderWith(built, statuses).lines[2];
+		expect(line).toContain("5h");
+		expect(line).toContain("hello");
+	});
+
+	it("leaves statuses verbatim when no feed has arrived", () => {
+		const statuses = new Map([
+			["context-tokens", "152,340 tok"],
+			["pi-quotas-usage", "5h: 34%"],
+		]);
+		const built = build(statuses);
+
+		const lines = renderWith(built, statuses).lines;
+		expect(lines[2]).toContain("152,340 tok");
+		expect(lines[2]).toContain("5h: 34%");
+		expect(lines[0]).not.toContain("╊");
+	});
+
+	it("ignores a context feed describing a different window", () => {
+		const statuses = new Map([["context-tokens", "152,340 tok"]]);
+		const built = build(statuses);
+		built.bus.emit(CONTEXT_TOKENS_UPDATED_EVENT, {
+			...contextFeed,
+			contextWindow: 1000000,
+		});
+
+		const lines = renderWith(built, statuses).lines;
+		expect(lines[0]).not.toContain("╊");
+		// The readout is not lost while the bar cannot show it.
+		expect(lines[2]).toContain("152,340 tok");
+	});
+
+	it("ignores a malformed feed rather than rendering its gaps", () => {
+		const statuses = new Map([["pi-quotas-usage", "5h: 34%"]]);
+		const built = build(statuses);
+		built.bus.emit(QUOTAS_USAGE_UPDATED_EVENT, {
+			statusKey: "pi-quotas-usage",
+			windows: [{ shortLabel: "5h" }],
+		});
+
+		const line = renderWith(built, statuses).lines[2];
+		expect(line).toContain("5h: 34%");
+		expect(line).not.toContain("undefined");
+	});
+
+	it("truncates a long chip group rather than overflowing the footer", () => {
+		const statuses = new Map([["pi-quotas-usage", "raw"]]);
+		const built = build(statuses);
+		built.bus.emit(QUOTAS_USAGE_UPDATED_EVENT, {
+			statusKey: "pi-quotas-usage",
+			windows: Array.from({ length: 12 }, (_, index) => ({
+				shortLabel: `w${index}`,
+				kind: "week",
+				valueText: "99%",
+				barPercent: 99,
+				severity: "none",
+				resetText: " ↺ 6d",
+				limited: false,
+			})),
+		});
+
+		const line = renderWith(built, statuses, 60).lines[2]!;
+		expect(visibleWidth(line)).toBeLessThanOrEqual(60);
+	});
+
+	it("can be turned off entirely", () => {
+		writeFileSync(
+			join(agentDir.path, "settings.json"),
+			JSON.stringify({ piStatusline: { structuredFeeds: false } }),
+		);
+
+		const statuses = new Map([
+			["context-tokens", "152,340 tok"],
+			["pi-quotas-usage", "5h: 34%"],
+		]);
+		const built = build(statuses);
+		built.bus.emit(CONTEXT_TOKENS_UPDATED_EVENT, contextFeed);
+		built.bus.emit(QUOTAS_USAGE_UPDATED_EVENT, quotasFeed);
+
+		const lines = renderWith(built, statuses).lines;
+		expect(lines[0]).not.toContain("╊");
+		expect(lines[2]).toContain("152,340 tok");
+		expect(lines[2]).toContain("5h: 34%");
 	});
 });
 

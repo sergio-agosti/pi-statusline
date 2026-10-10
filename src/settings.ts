@@ -27,6 +27,12 @@ export interface StatuslineSettings {
 	order: string[];
 	/** Keys to omit entirely. */
 	hide: string[];
+	/**
+	 * Draw the structured feeds other extensions publish — the dumb-zone tick on
+	 * the context bar, quota chips on the status line — instead of showing their
+	 * status text verbatim. Turn off to get the previous footer back.
+	 */
+	structuredFeeds: boolean;
 }
 
 export const DEFAULT_SETTINGS: StatuslineSettings = {
@@ -35,6 +41,7 @@ export const DEFAULT_SETTINGS: StatuslineSettings = {
 	separator: "  ",
 	order: [],
 	hide: [],
+	structuredFeeds: true,
 };
 
 function readJsonObject(path: string): Record<string, unknown> | undefined {
@@ -85,6 +92,8 @@ export function readSettings(cwd: string): StatuslineSettings {
 		separator: typeof merged.separator === "string" ? merged.separator : DEFAULT_SETTINGS.separator,
 		order: getStringArray(merged.order) ?? DEFAULT_SETTINGS.order,
 		hide: getStringArray(merged.hide) ?? DEFAULT_SETTINGS.hide,
+		structuredFeeds:
+			getBoolean(merged.structuredFeeds) ?? DEFAULT_SETTINGS.structuredFeeds,
 	};
 }
 

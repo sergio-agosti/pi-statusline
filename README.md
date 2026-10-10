@@ -4,9 +4,9 @@ A status line for [pi](https://pi.dev) in [pi-deck](https://github.com/hisea/pi-
 visual language — that also renders the status entries other extensions publish.
 
 ```
-  claude-opus-5-5 |  pi-statusline |  main |  feat/status   [db] ━━━━━─── 42%  ◐ high
-                                                              ↑12k ↓3.4k R56k $0.123 42.0%/200k
-  160.0k ◆  5h: 85%/93% (2h) · wk: 12% (3d)
+  claude-opus-5-5 |  pi-statusline |  main |  feat/status   [db] ━━━━━━━━━─╊─ 76%  ◐ high
+                                                                  76.2%/200k
+  5h ━━╸───── 34% ↺ 2h·19m  │  wk ━━━━━━╸─ 85% ↺ 3d
 ```
 
 ## Why this exists
@@ -22,11 +22,40 @@ underneath it. Line 3 appears only when at least one extension has set a
 status, so a session with no such extensions still gets pi-deck's clean
 two-line footer.
 
-Each status is rendered **verbatim**, including the colours the owning
-extension applied. That matters: a dumb-zone readout is only useful because it
-turns red as you approach the threshold, and a usage bar because it turns
-amber. Wrapping the line in an outer `dim` (as the token-stats line does) would
-be broken by each entry's trailing reset and would erase that signal.
+By default each status is rendered **verbatim**, including the colours the
+owning extension applied. That matters: a dumb-zone readout is only useful
+because it turns red as you approach the threshold, and a usage bar because it
+turns amber. Wrapping the line in an outer `dim` (as the token-stats line does)
+would be broken by each entry's trailing reset and would erase that signal.
+
+Extensions that publish a **structured feed** on `pi.events` get their data
+*drawn* instead — see [Structured feeds](#structured-feeds).
+
+## Structured feeds
+
+Two extensions publish their data on `pi.events` as well as a status string:
+
+| Channel                  | Published by     | Drawn as                       |
+| ------------------------ | ---------------- | ------------------------------ |
+| `context-tokens:updated` | `pi-token-count` | the dumb-zone tick on the bar  |
+| `quotas:usage:updated`   | `pi-quotas`      | quota chips on the status line |
+
+Drawing beats parsing. The status string is already rendered, so reading a
+number back out of it means guessing — and `pi-quotas` scores a window by
+*pace* as well as level, where the same 85% is a warning early in a window and
+fine late in one. That judgement cannot be recovered from the text, so the feed
+carries it directly, and the colour comes from the owning extension rather than
+from a threshold re-invented here.
+
+Each feed names the status key it supersedes, so the raw string is dropped
+rather than printed twice. Where a feed has not arrived — the extension is not
+installed, or has not published yet — the status string renders verbatim as
+before. The dumb-zone tick is drawn only when the feed describes the window
+currently on screen, so a reading left over from a previous model cannot put
+the tick in the wrong place; until then the raw readout stays visible.
+
+Set `structuredFeeds` to `false` to turn all of it off and get the verbatim
+footer back.
 
 ## Install
 
@@ -65,18 +94,20 @@ optional.
     "position": "bottom",
     "separator": "  ",
     "order": ["context-tokens", "pi-quotas-usage"],
-    "hide": []
+    "hide": [],
+    "structuredFeeds": true
   }
 }
 ```
 
-| Key          | Default    | Meaning                                                        |
-| ------------ | ---------- | -------------------------------------------------------------- |
-| `statusLine` | `true`     | Render the extension status line at all.                        |
-| `position`   | `"bottom"` | `"bottom"` below the token stats, or `"top"` above them.        |
-| `separator`  | `"  "`     | Placed between status entries.                                  |
-| `order`      | `[]`       | Keys to place first, in this sequence. Others follow, A→Z.      |
-| `hide`       | `[]`       | Keys to omit.                                                   |
+| Key               | Default    | Meaning                                                     |
+| ----------------- | ---------- | ----------------------------------------------------------- |
+| `statusLine`      | `true`     | Render the extension status line at all.                     |
+| `position`        | `"bottom"` | `"bottom"` below the token stats, or `"top"` above them.     |
+| `separator`       | `"  "`     | Placed between status entries.                               |
+| `order`           | `[]`       | Keys to place first, in this sequence. Others follow, A→Z.   |
+| `hide`            | `[]`       | Keys to omit.                                                |
+| `structuredFeeds` | `true`     | Draw the structured feeds instead of their status text.      |
 
 The default ordering is alphabetical by key, matching the built-in footer.
 Extensions can rely on that: `pi-token-count` deliberately picks the key
@@ -91,6 +122,10 @@ rather than breaking the footer.
 The layout, icons, and colour roles are pi-deck's. The changes:
 
 - **The extension status line is rendered.** The reason for this package.
+- **The context bar carries the dumb-zone threshold.** pi-deck's bar was
+  coloured by absolute fullness alone, which cannot say whether *this* model's
+  dumb zone has been reached. The tick and the colour now come from
+  `pi-token-count` when it is installed.
 - **`git worktree list` is no longer spawned per frame.** pi-deck called
   `execSync` inside `render()`, and the footer renders on every TUI frame —
   including every frame of a streaming response. The lookup is now cached with
