@@ -5,7 +5,7 @@ visual language — that also renders the status entries other extensions publis
 
 ```
   <model> claude-opus-5-5 <brain> ━━━───  <ctx> ━━━━──────╊─ 36% 360k/1.0M  <dir> pi-statusline  <branch> main
-  5h ━━╸───── 34% ↺ 2h·19m  wk ━━━━━━╸─ 85% ↺ 3d  mo ━━━━╸─── 62% ↺ 12d
+  5h ━━╸───── 34% <reset> 2h·19m  wk ━━━━━━╸─ 85% <reset> 3d  mo ━━━━╸─── 62% <reset> 12d
                                                        ↑1.8M ↓416k R57M $0.687 36.0%/1.0M
 ```
 
@@ -14,7 +14,9 @@ happening, pushed to the far right. Line 2 is how much of each quota is used,
 as chips that fill up like the context bar. Line 3 is what it has cost. Line 2
 appears only when at least one extension has set a status.
 
-`<model>`, `<dir>`, `<branch>`, `<ctx>` and `<brain>` are Nerd Font glyphs.
+`<model>`, `<dir>`, `<branch>`, `<ctx>`, `<brain>` and `<reset>` are Nerd Font
+glyphs. `<reset>` replaces the `↺` pi-quotas publishes, which JetBrains Mono
+lacks.
 
 ## Why this exists
 

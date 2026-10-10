@@ -30,6 +30,7 @@ const MODEL_ICON = "\u{f06a9}";
 const DIR_ICON = "\uf07b";
 const BRANCH_ICON = "\uf126";
 const CONTEXT_ICON = "\uf2db";
+const RESET_ICON = "\u{f02da}";
 
 type FooterFactory = (
 	tui: { requestRender(): void },
@@ -367,13 +368,27 @@ describe("structured feeds", () => {
 
 		// The feed carries remaining percent; chips show used, so they fill up
 		// as the quota is consumed, like the context bar.
-		expect(line).toContain("5h ━━━━━╸── 66% ↺ 2h·19m");
-		expect(line).toContain("7d ━╸────── 15% ↺ 3d");
+		expect(line).toContain(`5h ━━━━━╸── 66% ${RESET_ICON} 2h·19m`);
+		expect(line).toContain(`7d ━╸────── 15% ${RESET_ICON} 3d`);
+		// The font has no ↺, so the fallback glyph renders squashed; it is swapped
+		// for a Nerd Font icon the same width as the others.
+		expect(line).not.toContain("↺");
 		// Chips are spaced, not ruled.
-		expect(line).toContain(" ↺ 2h·19m  7d");
+		expect(line).toContain(`${RESET_ICON} 2h·19m  7d`);
 		expect(line).not.toContain("│");
 		expect(line).not.toContain(" | ");
 		expect(line).not.toContain("34%");
+	});
+
+	it("leaves a reset suffix without the ↺ marker as published", () => {
+		const statuses = new Map([["pi-quotas-usage", "5h: 34%"]]);
+		const built = build(statuses);
+		built.bus.emit(QUOTAS_USAGE_UPDATED_EVENT, {
+			statusKey: "pi-quotas-usage",
+			windows: [{ ...quotasFeed.windows[0], resetText: " resets 2h" }],
+		});
+
+		expect(renderWith(built, statuses).lines[1]).toContain("66% resets 2h");
 	});
 
 	it("keeps other extensions' statuses alongside the chips", () => {

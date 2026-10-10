@@ -70,6 +70,7 @@ const ICONS = {
 	worktree: "\uec7e", // cod-worktree
 	context: "\uf2db", // fa-microchip
 	brain: "\uee9c", // fa-brain
+	reset: "\u{f02da}", // md-history
 } as const;
 
 /**
@@ -439,7 +440,7 @@ function renderQuotaChips(
 }
 
 /**
- * One quota window: `5h ━━╸───── 34% ↺ 2h·19m`, showing percent used.
+ * One quota window: `5h ━━╸───── 34% <reset> 2h·19m`, showing percent used.
  *
  * The reset suffix, and the value text of a window without a bar, are
  * published pre-formatted by pi-quotas, so this only places them. A bar is
@@ -463,8 +464,16 @@ function renderQuotaChip(theme: Theme, window: QuotaFeedWindow): string {
 	}
 	if (window.limited) chip += theme.fg("error", " !");
 	// The reset suffix carries its own leading space, matching the footer it
-	// came from.
-	if (window.resetText) chip += theme.fg("dim", sanitizeInlineText(window.resetText));
+	// came from. Its ↺ is not in JetBrains Mono, so the terminal squeezes a
+	// fallback glyph into one cell; it is swapped for a Nerd Font icon the
+	// width of the others. A suffix without the marker passes through as is.
+	if (window.resetText) {
+		const resetText = sanitizeInlineText(window.resetText).replace(
+			/^ ↺ /u,
+			" " + ICONS.reset + ICON_GAP,
+		);
+		chip += theme.fg("dim", resetText);
+	}
 
 	return chip;
 }
