@@ -4,7 +4,7 @@ A status line for [pi](https://pi.dev) in [pi-deck](https://github.com/hisea/pi-
 visual language — that also renders the status entries other extensions publish.
 
 ```
-  <model> claude-opus-5-5 <brain> medium  <ctx> ━━━━──────╊─ 36% 360k/1.0M  <dir> pi-statusline  <branch> main
+  <model> claude-opus-5-5 <brain> ━━━───  <ctx> ━━━━──────╊─ 36% 360k/1.0M  <dir> pi-statusline  <branch> main
   5h ━━╸───── 34% ↺ 2h·19m  wk ━━━━━━╸─ 85% ↺ 3d  mo ━━━━╸─── 62% ↺ 12d
                                                        ↑1.8M ↓416k R57M $0.687 36.0%/1.0M
 ```
@@ -142,9 +142,10 @@ The layout, icons, and colour roles are pi-deck's. The changes:
   were silently dropped, undercounting tokens and cost. This matches the
   built-in footer's accounting.
 - **The `max` thinking level is mapped.** pi-deck's table stopped at `xhigh`,
-  so `max` fell back to `dim`. The level is also shown beside the model with a
-  brain glyph rather than on the right, and the context bar moved next to it,
-  leaving the folder and branch on the right.
+  so `max` fell back to `dim`. The level is also shown beside the model, as a
+  brain glyph and a bar filled to the level, with each cell in its own
+  level's colour, rather than as a word on the right. The context bar moved
+  next to it, leaving the folder and branch on the right.
 - **Icons are the same width.** Ghostty and the proportional Nerd Font variant
   draw icons at their natural width, so each spills over the space after it.
   pi-deck's set ranged from 1.25 to 1.9 cells, which made the gaps uneven; the

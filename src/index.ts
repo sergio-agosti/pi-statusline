@@ -89,6 +89,10 @@ const THINKING_COLORS: Record<string, ThemeColor> = {
 	max: "thinkingMax",
 };
 
+/** The thinking levels drawn as bar steps, lowest first. `off` draws nothing. */
+const THINKING_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
+
+
 const CONTEXT_BAR_WIDTH = 12;
 const QUOTA_BAR_WIDTH = 8;
 
@@ -254,12 +258,7 @@ function renderIdentityLine(
 	// much room left. Kept together on the left.
 	const thinkingLevel = ctx.thinkingLevel;
 	const thinking =
-		!thinkingLevel || thinkingLevel === "off"
-			? ""
-			: theme.fg(
-					THINKING_COLORS[thinkingLevel] ?? "dim",
-					ICONS.brain + ICON_GAP + thinkingLevel,
-				);
+		!thinkingLevel || thinkingLevel === "off" ? "" : renderThinking(theme, thinkingLevel);
 
 	const left = [
 		c("syntaxType", ICONS.model + ICON_GAP + (ctx.model?.id ?? "no-model")),
@@ -280,6 +279,27 @@ function renderIdentityLine(
 		Math.max(1, width - visibleWidth(leftText) - visibleWidth(rightText)),
 	);
 	return truncateToWidth(leftText + padding + rightText, width);
+}
+
+/**
+ * The thinking level as a bar in the same style as the context and quota bars:
+ * one cell per level, `━━━━──` at high.
+ *
+ * Each lit cell takes its own level's colour, so a higher level shows more of
+ * the gradient, and the unlit track stays dim to show the headroom. A level the
+ * table does not know, from a newer pi, falls back to its name.
+ */
+function renderThinking(theme: Theme, level: string): string {
+	const color = THINKING_COLORS[level] ?? "dim";
+	const icon = theme.fg(color, ICONS.brain + ICON_GAP);
+	const lit = THINKING_LEVELS.indexOf(level as (typeof THINKING_LEVELS)[number]);
+	if (lit < 0) return icon + theme.fg(color, level);
+
+	const cells = THINKING_LEVELS.slice(0, lit + 1).map((litLevel) =>
+		theme.fg(THINKING_COLORS[litLevel]!, "━"),
+	);
+	const unlit = "─".repeat(THINKING_LEVELS.length - lit - 1);
+	return icon + cells.join("") + (unlit ? theme.fg("dim", unlit) : "");
 }
 
 /**

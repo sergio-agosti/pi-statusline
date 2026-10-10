@@ -503,7 +503,7 @@ describe("core lines", () => {
 		}
 	});
 
-	it("shows the thinking level beside the model", () => {
+	it("shows the thinking level beside the model as a bar", () => {
 		const statuses = new Map<string, string>();
 		const built = createContext({
 			session: { entries: [], sessionId: "s1", leafId: null },
@@ -514,12 +514,40 @@ describe("core lines", () => {
 
 		const { lines, theme } = renderWith(built, statuses);
 		// Directly after the model, not out on the right where the bar lives.
-		expect(lines[0]).toContain(`claude-opus-5-5  ${BRAIN} high`);
-		expect(
-			theme.calls.some(
-				(call) => call.token === "thinkingHigh" && call.text === `${BRAIN} high`,
-			),
-		).toBe(true);
+		// One cell per level, minimal through max; high is the fourth.
+		expect(lines[0]).toContain(`claude-opus-5-5  ${BRAIN} ━━━━──`);
+		expect(lines[0]).not.toContain("high");
+		// Each lit cell in its own level's colour, so the bar warms as it fills.
+		const lit = theme.calls.filter((call) => call.text === "━").map((call) => call.token);
+		expect(lit).toEqual(["thinkingMinimal", "thinkingLow", "thinkingMedium", "thinkingHigh"]);
+		expect(theme.calls.some((call) => call.token === "dim" && call.text === "──")).toBe(true);
+		expect(theme.calls.find((call) => call.text === `${BRAIN} `)?.token).toBe("thinkingHigh");
+	});
+
+	it("fills the whole bar at max", () => {
+		const statuses = new Map<string, string>();
+		const built = createContext({
+			session: { entries: [], sessionId: "s1", leafId: null },
+			statuses,
+			cwd: workDir,
+			thinkingLevel: "max",
+		});
+
+		const { lines, theme } = renderWith(built, statuses);
+		expect(lines[0]).toContain(`${BRAIN} ━━━━━━ `);
+		expect(theme.calls.filter((call) => call.text === "━").at(-1)?.token).toBe("thinkingMax");
+	});
+
+	it("falls back to the level name for a level it does not know", () => {
+		const statuses = new Map<string, string>();
+		const built = createContext({
+			session: { entries: [], sessionId: "s1", leafId: null },
+			statuses,
+			cwd: workDir,
+			thinkingLevel: "ultra",
+		});
+
+		expect(renderWith(built, statuses).lines[0]).toContain(`${BRAIN} ultra`);
 	});
 
 	it("hides the thinking indicator when thinking is off", () => {
