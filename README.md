@@ -4,8 +4,8 @@ A status line for [pi](https://pi.dev) in [pi-deck](https://github.com/hisea/pi-
 visual language — that also renders the status entries other extensions publish.
 
 ```
-  claude-opus-5-5 |  pi-statusline |  main |  feat/status   [db] ━━━━━━━━━─╊─ 76%  ◐ high
-                                                                  76.2%/200k
+  claude-opus-5-5  high |  pi-statusline |  main |  feat/status   [db] ━━━━━━━━━─╊─ 76%
+                                                                         76.2%/200k
   5h ━━╸───── 34% ↺ 2h·19m  │  wk ━━━━━━╸─ 85% ↺ 3d
 ```
 
@@ -135,7 +135,9 @@ The layout, icons, and colour roles are pi-deck's. The changes:
   were silently dropped, undercounting tokens and cost. This matches the
   built-in footer's accounting.
 - **The `max` thinking level is mapped.** pi-deck's table stopped at `xhigh`,
-  so `max` fell back to `dim`.
+  so `max` fell back to `dim`. The level is also shown beside the model with a
+  brain glyph rather than on the right, since it describes how the model is
+  being invoked.
 - **A stale context degrades instead of throwing.** The footer's context
   resolves lazily through getters that throw once the extension runner goes
   inactive (session switch, reload). A throw inside the TUI render loop is not

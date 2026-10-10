@@ -8,7 +8,7 @@
  * indicator, and anything else an extension publishes. This extension keeps
  * pi-deck's two-line layout and adds the status line back underneath it.
  *
- *   line 1   model | dir | branch | worktree       [context bar ╊] ◐ thinking
+ *   line 1   model + thinking | dir | branch | worktree       [context bar ╊]
  *   line 2                              ↑in ↓out Rcache Wcache $cost 45%/200k
  *   line 3   5h ━━╸───── 34% ↺ 2h·19m  │  7d ━━━━━━╸─ 85% ↺ 3d
  *
@@ -55,11 +55,12 @@ import { getWorktreeLabel, invalidateWorktreeCache } from "./worktree.ts";
 
 /** Nerd Font glyphs, matching pi-deck. */
 const ICONS = {
-	model: "\uee0d ",
-	dir: "\uf4d3 ",
+	model: "\uee0d",
+	dir: "\uf4d3",
 	branch: "\uf126",
 	worktree: "\u{f0405}",
 	context: "\uf2db",
+	brain: "\uf5dc",
 } as const;
 
 const THINKING_COLORS: Record<string, ThemeColor> = {
@@ -227,22 +228,26 @@ function renderIdentityLine(
 	const branch = footerData.getGitBranch();
 	const worktree = getWorktreeLabel(cwd);
 
+	// The thinking level sits beside the model rather than on the right: it says
+	// how the model is being invoked, and the right-hand side belongs to the
+	// context bar.
+	const thinkingLevel = ctx.thinkingLevel;
+	const thinking =
+		!thinkingLevel || thinkingLevel === "off"
+			? ""
+			: theme.fg(
+					THINKING_COLORS[thinkingLevel] ?? "dim",
+					" " + ICONS.brain + " " + thinkingLevel,
+				);
+
 	const left = [
-		c("syntaxType", " " + ICONS.model + " " + (ctx.model?.id ?? "no-model")),
+		c("syntaxType", " " + ICONS.model + " " + (ctx.model?.id ?? "no-model")) + thinking,
 		c("syntaxFunction", ICONS.dir + " " + (cwd.split("/").pop() || cwd)),
 		branch ? c("success", ICONS.branch + " " + branch) : "",
 		worktree ? c("syntaxNumber", ICONS.worktree + " " + worktree) : "",
 	].filter(Boolean);
 
-	const thinkingLevel = ctx.thinkingLevel;
-	const thinking =
-		!thinkingLevel || thinkingLevel === "off"
-			? ""
-			: theme.fg(THINKING_COLORS[thinkingLevel] ?? "dim", "◐ " + thinkingLevel);
-
-	const right = [renderContextBar(theme, ctx, contextFeed), thinking]
-		.filter(Boolean)
-		.join(theme.fg("dim", "  "));
+	const right = renderContextBar(theme, ctx, contextFeed);
 
 	const leftText = left.join(theme.fg("dim", " | "));
 	const padding = " ".repeat(

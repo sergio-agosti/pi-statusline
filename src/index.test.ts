@@ -25,6 +25,7 @@ import { CONTEXT_TOKENS_UPDATED_EVENT, QUOTAS_USAGE_UPDATED_EVENT } from "./feed
 
 const RED = "\u001b[31m";
 const RESET = "\u001b[0m";
+const BRAIN = "\uf5dc";
 
 type FooterFactory = (
 	tui: { requestRender(): void },
@@ -459,7 +460,7 @@ describe("core lines", () => {
 		expect(line).toContain("main");
 	});
 
-	it("shows the thinking level", () => {
+	it("shows the thinking level beside the model", () => {
 		const statuses = new Map<string, string>();
 		const built = createContext({
 			session: { entries: [], sessionId: "s1", leafId: null },
@@ -468,7 +469,14 @@ describe("core lines", () => {
 			thinkingLevel: "high",
 		});
 
-		expect(renderWith(built, statuses).lines[0]).toContain("◐ high");
+		const { lines, theme } = renderWith(built, statuses);
+		// Directly after the model, not out on the right where the bar lives.
+		expect(lines[0]).toContain(`claude-opus-5-5 ${BRAIN} high`);
+		expect(
+			theme.calls.some(
+				(call) => call.token === "thinkingHigh" && call.text === ` ${BRAIN} high`,
+			),
+		).toBe(true);
 	});
 
 	it("hides the thinking indicator when thinking is off", () => {
@@ -480,7 +488,7 @@ describe("core lines", () => {
 			thinkingLevel: "off",
 		});
 
-		expect(renderWith(built, statuses).lines[0]).not.toContain("◐");
+		expect(renderWith(built, statuses).lines[0]).not.toContain(BRAIN);
 	});
 
 	it("colours the context percentage red past 90%", () => {
