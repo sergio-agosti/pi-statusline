@@ -500,6 +500,19 @@ describe("core lines", () => {
 		expect(line).toContain("main");
 	});
 
+	it("puts the branch before the folder, so the folder ends the line", () => {
+		const statuses = new Map<string, string>();
+		const built = createContext({
+			session: { entries: [], sessionId: "s1", leafId: null },
+			statuses,
+			cwd: workDir,
+		});
+
+		const line = renderWith(built, statuses).lines[0]!;
+		expect(line.indexOf(`${BRANCH_ICON} main`)).toBeLessThan(line.indexOf(DIR_ICON));
+		expect(line.trimEnd().endsWith(workDir.split("/").pop()!)).toBe(true);
+	});
+
 	it("follows every icon with the same single space", () => {
 		// The icons are chosen to draw equally wide, so one shared gap spaces
 		// them evenly. A per-icon gap would undo that.

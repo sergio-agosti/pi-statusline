@@ -8,7 +8,7 @@
  * indicator, and anything else an extension publishes. This extension keeps
  * pi-deck's two-line layout and adds the status line back underneath it.
  *
- *   line 1   model + thinking | context             folder | git
+ *   line 1   model + thinking | context             git | folder
  *   line 2   5h ━━╸───── 34% ↺ 2h·19m  wk ━━━━━━╸─ 85% ↺ 3d
  *   line 3                              ↑in ↓out Rcache Wcache $cost 45%/200k
  *
@@ -241,7 +241,7 @@ export default function piStatusline(pi: ExtensionAPI) {
 	});
 }
 
-/** `model + thinking | context` on the left, `folder | git` on the right. */
+/** `model + thinking | context` on the left, `git | folder` on the right. */
 function renderIdentityLine(
 	theme: Theme,
 	footerData: ReadonlyFooterDataProvider,
@@ -269,9 +269,9 @@ function renderIdentityLine(
 
 	// Where it is happening, pushed to the far end.
 	const right = [
-		c("syntaxFunction", ICONS.dir + ICON_GAP + (cwd.split("/").pop() || cwd)),
 		branch ? c("success", ICONS.branch + ICON_GAP + branch) : "",
 		worktree ? c("syntaxNumber", ICONS.worktree + ICON_GAP + worktree) : "",
+		c("syntaxFunction", ICONS.dir + ICON_GAP + (cwd.split("/").pop() || cwd)),
 	].filter(Boolean);
 
 	const leftText = left.join(theme.fg("dim", SEGMENT_GAP));
