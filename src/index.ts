@@ -294,7 +294,8 @@ function renderContextBar(
 	const contextWindow = contextWindowOf(ctx);
 	if (contextWindow <= 0) return "";
 
-	const percent = ctx.getContextUsage()?.percent ?? 0;
+	const usage = ctx.getContextUsage();
+	const percent = usage?.percent ?? 0;
 	const segments = contextBarSegments(
 		Math.min(1, percent / 100),
 		CONTEXT_BAR_WIDTH,
@@ -319,7 +320,11 @@ function renderContextBar(
 	return (
 		theme.fg("syntaxString", ICONS.context + ICON_GAP) +
 		bar +
-		theme.fg(barToken, " " + Math.round(percent) + "%")
+		theme.fg(barToken, " " + Math.round(percent) + "%") +
+		// Unknown right after compaction, until the next response reports usage.
+		(usage?.tokens != null
+			? theme.fg("dim", " " + formatTokens(usage.tokens) + "/" + formatTokens(contextWindow))
+			: "")
 	);
 }
 

@@ -86,6 +86,7 @@ function createContext(options: {
 	statuses: Map<string, string>;
 	cwd: string;
 	percent?: number;
+	tokens?: number | null;
 	contextWindow?: number;
 	modelId?: string;
 	thinkingLevel?: string;
@@ -107,7 +108,7 @@ function createContext(options: {
 		model: { id: options.modelId ?? "claude-opus-5-5", contextWindow: options.contextWindow },
 		getContextUsage: () => ({
 			percent: options.percent ?? 0,
-			tokens: 1000,
+			tokens: options.tokens === undefined ? 1000 : options.tokens,
 			contextWindow: options.contextWindow ?? 200000,
 		}),
 		sessionManager: {
@@ -530,6 +531,34 @@ describe("core lines", () => {
 		});
 
 		expect(renderWith(built, statuses).lines[0]).not.toContain(BRAIN);
+	});
+
+	it("shows used and total tokens beside the context percentage", () => {
+		const statuses = new Map<string, string>();
+		const built = createContext({
+			session: { entries: [], sessionId: "s1", leafId: null },
+			statuses,
+			cwd: workDir,
+			percent: 7,
+			tokens: 14200,
+		});
+
+		expect(renderWith(built, statuses).lines[0]).toContain("7% 14k/200k");
+	});
+
+	it("shows only the percentage when the token count is unknown", () => {
+		const statuses = new Map<string, string>();
+		const built = createContext({
+			session: { entries: [], sessionId: "s1", leafId: null },
+			statuses,
+			cwd: workDir,
+			percent: 0,
+			tokens: null,
+		});
+
+		const line = renderWith(built, statuses).lines[0]!;
+		expect(line).toContain("0%");
+		expect(line).not.toContain("/200k");
 	});
 
 	it("colours the context percentage red past 90%", () => {
