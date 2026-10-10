@@ -253,11 +253,13 @@ function renderIdentityLine(
 			? ""
 			: theme.fg(
 					THINKING_COLORS[thinkingLevel] ?? "dim",
-					" " + ICONS.brain + ICON_GAP + thinkingLevel,
+					// The brain glyph sits within its cell, so one space is enough.
+					ICONS.brain + " " + thinkingLevel,
 				);
 
 	const left = [
-		c("syntaxType", " " + ICONS.model + ICON_GAP + (ctx.model?.id ?? "no-model")) + thinking,
+		c("syntaxType", ICONS.model + ICON_GAP + (ctx.model?.id ?? "no-model")),
+		thinking,
 		renderContextBar(theme, ctx, contextFeed),
 	].filter(Boolean);
 

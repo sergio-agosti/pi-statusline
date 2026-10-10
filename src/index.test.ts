@@ -512,10 +512,10 @@ describe("core lines", () => {
 
 		const { lines, theme } = renderWith(built, statuses);
 		// Directly after the model, not out on the right where the bar lives.
-		expect(lines[0]).toContain(`claude-opus-5-5 ${BRAIN}  high`);
+		expect(lines[0]).toContain(`claude-opus-5-5  ${BRAIN} high`);
 		expect(
 			theme.calls.some(
-				(call) => call.token === "thinkingHigh" && call.text === ` ${BRAIN}  high`,
+				(call) => call.token === "thinkingHigh" && call.text === `${BRAIN} high`,
 			),
 		).toBe(true);
 	});
