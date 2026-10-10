@@ -53,26 +53,31 @@ import {
 import { orderStatusEntries, readSettings, type StatuslineSettings } from "./settings.ts";
 import { getWorktreeLabel, invalidateWorktreeCache } from "./worktree.ts";
 
-/** Nerd Font glyphs, matching pi-deck. */
+/**
+ * Nerd Font glyphs, chosen to be the same width.
+ *
+ * Terminals that draw Nerd Font icons at their natural width (Ghostty, the
+ * Propo font variant) let each one spill over the cell after it, so the
+ * visible gap after an icon is its spaces minus that spill. Gaps only come in
+ * whole cells, so equal gaps need equally wide glyphs: every icon here draws
+ * about 1.5 cells wide (branch, the narrowest, 1.35), mixing glyph families
+ * where the obvious pick was off-size — Font Awesome's robot is 1.9.
+ */
 const ICONS = {
-	model: "\uee0d",
-	dir: "\uf4d3",
-	branch: "\uf126",
-	worktree: "\u{f0405}",
-	context: "\uf2db",
-	brain: "\uee9c",
+	model: "\u{f06a9}", // md-robot
+	dir: "\uf07b", // fa-folder
+	branch: "\uf126", // fa-code_branch
+	worktree: "\uec7e", // cod-worktree
+	context: "\uf2db", // fa-microchip
+	brain: "\uee9c", // fa-brain
 } as const;
 
 /**
- * Two spaces after an icon, not one.
- *
- * The proportional JetBrainsMono Nerd Font variant (Propo) draws these glyphs
- * at 1.25–1.9x a cell, so each one bleeds over the cell that follows it and
- * swallows a single space. Two cells of gap leaves one visible. In the Mono
- * variant, where every glyph measures exactly one cell, this reads as a
- * slightly wider gap rather than a missing one.
+ * One space after every icon. A ~1.5-cell glyph spills half a cell into it,
+ * leaving a half-cell gap; a second space would leave a cell and a half. Where
+ * every glyph is exactly one cell wide, this reads as an ordinary space.
  */
-const ICON_GAP = "  ";
+const ICON_GAP = " ";
 
 const THINKING_COLORS: Record<string, ThemeColor> = {
 	off: "dim",
@@ -253,8 +258,7 @@ function renderIdentityLine(
 			? ""
 			: theme.fg(
 					THINKING_COLORS[thinkingLevel] ?? "dim",
-					// The brain glyph sits within its cell, so one space is enough.
-					ICONS.brain + " " + thinkingLevel,
+					ICONS.brain + ICON_GAP + thinkingLevel,
 				);
 
 	const left = [

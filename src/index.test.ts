@@ -26,9 +26,10 @@ import { CONTEXT_TOKENS_UPDATED_EVENT, QUOTAS_USAGE_UPDATED_EVENT } from "./feed
 const RED = "\u001b[31m";
 const RESET = "\u001b[0m";
 const BRAIN = "\uee9c";
-const MODEL_ICON = "\uee0d";
-const DIR_ICON = "\uf4d3";
+const MODEL_ICON = "\u{f06a9}";
+const DIR_ICON = "\uf07b";
 const BRANCH_ICON = "\uf126";
+const CONTEXT_ICON = "\uf2db";
 
 type FooterFactory = (
 	tui: { requestRender(): void },
@@ -484,20 +485,21 @@ describe("core lines", () => {
 		expect(line).toContain("main");
 	});
 
-	it("leaves a visible gap after every icon", () => {
-		// The proportional Nerd Font variant draws these glyphs wider than a cell
-		// and swallows a single space, so each icon is followed by two. Regressing
-		// this to one space makes the label collide with the glyph.
+	it("follows every icon with the same single space", () => {
+		// The icons are chosen to draw equally wide, so one shared gap spaces
+		// them evenly. A per-icon gap would undo that.
 		const statuses = new Map<string, string>();
 		const built = createContext({
 			session: { entries: [], sessionId: "s1", leafId: null },
 			statuses,
 			cwd: workDir,
+			percent: 10,
+			thinkingLevel: "high",
 		});
 
 		const line = renderWith(built, statuses).lines[0]!;
-		for (const glyph of [MODEL_ICON, DIR_ICON, BRANCH_ICON]) {
-			expect(line).toContain(`${glyph}  `);
+		for (const glyph of [MODEL_ICON, BRAIN, CONTEXT_ICON, DIR_ICON, BRANCH_ICON]) {
+			expect(line).toMatch(new RegExp(`${glyph} \\S`, "u"));
 		}
 	});
 

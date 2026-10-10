@@ -145,9 +145,10 @@ The layout, icons, and colour roles are pi-deck's. The changes:
   so `max` fell back to `dim`. The level is also shown beside the model with a
   brain glyph rather than on the right, and the context bar moved next to it,
   leaving the folder and branch on the right.
-- **Icons are followed by two spaces.** The proportional Nerd Font variant
-  draws these glyphs 1.25–1.9x a cell wide, so each one bleeds over the cell
-  after it and swallows a single space.
+- **Icons are the same width.** Ghostty and the proportional Nerd Font variant
+  draw icons at their natural width, so each spills over the space after it.
+  pi-deck's set ranged from 1.25 to 1.9 cells, which made the gaps uneven; the
+  icons here all draw about 1.5 cells wide and share one trailing space.
 - **A stale context degrades instead of throwing.** The footer's context
   resolves lazily through getters that throw once the extension runner goes
   inactive (session switch, reload). A throw inside the TUI render loop is not
