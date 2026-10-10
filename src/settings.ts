@@ -19,7 +19,11 @@ export type StatusLinePosition = "bottom" | "top";
 export interface StatuslineSettings {
 	/** Render the extension status line at all. */
 	statusLine: boolean;
-	/** Where the status line sits: below the token stats, or above them. */
+	/**
+	 * Whether the status line sits above the usage line or below it. Above by
+	 * default, so the footer reads top to bottom as what the turn is, what is
+	 * left, then what it has cost.
+	 */
 	position: StatusLinePosition;
 	/** Placed between status entries. */
 	separator: string;
@@ -37,7 +41,7 @@ export interface StatuslineSettings {
 
 export const DEFAULT_SETTINGS: StatuslineSettings = {
 	statusLine: true,
-	position: "bottom",
+	position: "top",
 	separator: "  ",
 	order: [],
 	hide: [],

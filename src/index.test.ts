@@ -25,7 +25,10 @@ import { CONTEXT_TOKENS_UPDATED_EVENT, QUOTAS_USAGE_UPDATED_EVENT } from "./feed
 
 const RED = "\u001b[31m";
 const RESET = "\u001b[0m";
-const BRAIN = "\uf5dc";
+const BRAIN = "\uee9c";
+const MODEL_ICON = "\uee0d";
+const DIR_ICON = "\uf4d3";
+const BRANCH_ICON = "\uf126";
 
 type FooterFactory = (
 	tui: { requestRender(): void },
@@ -147,7 +150,7 @@ afterEach(() => {
 });
 
 describe("status line rendering", () => {
-	it("adds a third line carrying every extension status", () => {
+	it("adds a second line carrying every extension status", () => {
 		const statuses = new Map([
 			["context-tokens", "160.0k ◆"],
 			["pi-quotas-usage", "5h: 85%/93% (2h)"],
@@ -161,11 +164,11 @@ describe("status line rendering", () => {
 		const lines = renderWith(built, statuses).lines;
 
 		expect(lines).toHaveLength(3);
-		expect(lines[2]).toContain("160.0k ◆");
-		expect(lines[2]).toContain("5h: 85%/93% (2h)");
+		expect(lines[1]).toContain("160.0k ◆");
+		expect(lines[1]).toContain("5h: 85%/93% (2h)");
 	});
 
-	it("omits the third line when no extension published a status", () => {
+	it("omits the second line when no extension published a status", () => {
 		const statuses = new Map<string, string>();
 		const built = createContext({
 			session: { entries: [], sessionId: "s1", leafId: null },
@@ -184,7 +187,7 @@ describe("status line rendering", () => {
 			cwd: workDir,
 		});
 
-		const line = renderWith(built, statuses).lines[2];
+		const line = renderWith(built, statuses).lines[1];
 		expect(line).toContain(RED);
 		expect(line).toContain(RESET);
 	});
@@ -205,12 +208,7 @@ describe("status line rendering", () => {
 		}
 	});
 
-	it("places the status line above the stats line when configured to", () => {
-		writeFileSync(
-			join(agentDir.path, "settings.json"),
-			JSON.stringify({ piStatusline: { position: "top" } }),
-		);
-
+	it("puts the status line above the stats line by default", () => {
 		const statuses = new Map([["context-tokens", "160.0k ◆"]]);
 		const built = createContext({
 			session: {
@@ -226,6 +224,29 @@ describe("status line rendering", () => {
 		expect(lines).toHaveLength(3);
 		expect(lines[1]).toContain("160.0k ◆");
 		expect(lines[2]).toContain("↑100");
+	});
+
+	it("puts the status line below the stats line when configured to", () => {
+		writeFileSync(
+			join(agentDir.path, "settings.json"),
+			JSON.stringify({ piStatusline: { position: "bottom" } }),
+		);
+
+		const statuses = new Map([["context-tokens", "160.0k ◆"]]);
+		const built = createContext({
+			session: {
+				entries: [assistantEntry(100, 10, 0, 0, 0.1)],
+				sessionId: "s1",
+				leafId: null,
+			},
+			statuses,
+			cwd: workDir,
+		});
+
+		const lines = renderWith(built, statuses).lines;
+		expect(lines).toHaveLength(3);
+		expect(lines[1]).toContain("↑100");
+		expect(lines[2]).toContain("160.0k ◆");
 	});
 
 	it("hides configured keys", () => {
@@ -244,7 +265,7 @@ describe("status line rendering", () => {
 			cwd: workDir,
 		});
 
-		const line = renderWith(built, statuses).lines[2];
+		const line = renderWith(built, statuses).lines[1];
 		expect(line).toContain("160.0k ◆");
 		expect(line).not.toContain("skip me");
 	});
@@ -340,7 +361,7 @@ describe("structured feeds", () => {
 		const built = build(statuses);
 		built.bus.emit(QUOTAS_USAGE_UPDATED_EVENT, quotasFeed);
 
-		const line = renderWith(built, statuses).lines[2];
+		const line = renderWith(built, statuses).lines[1];
 
 		expect(line).toContain("5h");
 		expect(line).toContain("━━╸─────");
@@ -359,7 +380,7 @@ describe("structured feeds", () => {
 		const built = build(statuses);
 		built.bus.emit(QUOTAS_USAGE_UPDATED_EVENT, quotasFeed);
 
-		const line = renderWith(built, statuses).lines[2];
+		const line = renderWith(built, statuses).lines[1];
 		expect(line).toContain("5h");
 		expect(line).toContain("hello");
 	});
@@ -372,8 +393,8 @@ describe("structured feeds", () => {
 		const built = build(statuses);
 
 		const lines = renderWith(built, statuses).lines;
-		expect(lines[2]).toContain("152,340 tok");
-		expect(lines[2]).toContain("5h: 34%");
+		expect(lines[1]).toContain("152,340 tok");
+		expect(lines[1]).toContain("5h: 34%");
 		expect(lines[0]).not.toContain("╊");
 	});
 
@@ -388,7 +409,7 @@ describe("structured feeds", () => {
 		const lines = renderWith(built, statuses).lines;
 		expect(lines[0]).not.toContain("╊");
 		// The readout is not lost while the bar cannot show it.
-		expect(lines[2]).toContain("152,340 tok");
+		expect(lines[1]).toContain("152,340 tok");
 	});
 
 	it("ignores a malformed feed rather than rendering its gaps", () => {
@@ -399,7 +420,7 @@ describe("structured feeds", () => {
 			windows: [{ shortLabel: "5h" }],
 		});
 
-		const line = renderWith(built, statuses).lines[2];
+		const line = renderWith(built, statuses).lines[1];
 		expect(line).toContain("5h: 34%");
 		expect(line).not.toContain("undefined");
 	});
@@ -420,7 +441,7 @@ describe("structured feeds", () => {
 			})),
 		});
 
-		const line = renderWith(built, statuses, 60).lines[2]!;
+		const line = renderWith(built, statuses, 60).lines[1]!;
 		expect(visibleWidth(line)).toBeLessThanOrEqual(60);
 	});
 
@@ -440,8 +461,8 @@ describe("structured feeds", () => {
 
 		const lines = renderWith(built, statuses).lines;
 		expect(lines[0]).not.toContain("╊");
-		expect(lines[2]).toContain("152,340 tok");
-		expect(lines[2]).toContain("5h: 34%");
+		expect(lines[1]).toContain("152,340 tok");
+		expect(lines[1]).toContain("5h: 34%");
 	});
 });
 
@@ -460,6 +481,23 @@ describe("core lines", () => {
 		expect(line).toContain("main");
 	});
 
+	it("leaves a visible gap after every icon", () => {
+		// The proportional Nerd Font variant draws these glyphs wider than a cell
+		// and swallows a single space, so each icon is followed by two. Regressing
+		// this to one space makes the label collide with the glyph.
+		const statuses = new Map<string, string>();
+		const built = createContext({
+			session: { entries: [], sessionId: "s1", leafId: null },
+			statuses,
+			cwd: workDir,
+		});
+
+		const line = renderWith(built, statuses).lines[0]!;
+		for (const glyph of [MODEL_ICON, DIR_ICON, BRANCH_ICON]) {
+			expect(line).toContain(`${glyph}  `);
+		}
+	});
+
 	it("shows the thinking level beside the model", () => {
 		const statuses = new Map<string, string>();
 		const built = createContext({
@@ -471,10 +509,10 @@ describe("core lines", () => {
 
 		const { lines, theme } = renderWith(built, statuses);
 		// Directly after the model, not out on the right where the bar lives.
-		expect(lines[0]).toContain(`claude-opus-5-5 ${BRAIN} high`);
+		expect(lines[0]).toContain(`claude-opus-5-5 ${BRAIN}  high`);
 		expect(
 			theme.calls.some(
-				(call) => call.token === "thinkingHigh" && call.text === ` ${BRAIN} high`,
+				(call) => call.token === "thinkingHigh" && call.text === ` ${BRAIN}  high`,
 			),
 		).toBe(true);
 	});

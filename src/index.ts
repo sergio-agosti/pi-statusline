@@ -8,11 +8,11 @@
  * indicator, and anything else an extension publishes. This extension keeps
  * pi-deck's two-line layout and adds the status line back underneath it.
  *
- *   line 1   model + thinking | dir | branch | worktree       [context bar ╊]
- *   line 2                              ↑in ↓out Rcache Wcache $cost 45%/200k
- *   line 3   5h ━━╸───── 34% ↺ 2h·19m  │  7d ━━━━━━╸─ 85% ↺ 3d
+ *   line 1   model + thinking | context             folder | git
+ *   line 2   5h ━━╸───── 34% ↺ 2h·19m  │  wk ━━━━━━╸─ 85% ↺ 3d
+ *   line 3                              ↑in ↓out Rcache Wcache $cost 45%/200k
  *
- * Line 3 appears only when at least one extension has set a status.
+ * Line 2 appears only when at least one extension has set a status.
  *
  * Extensions that publish a structured feed on `pi.events` — pi-token-count and
  * pi-quotas — get their data drawn rather than printed: the dumb-zone threshold
@@ -60,8 +60,19 @@ const ICONS = {
 	branch: "\uf126",
 	worktree: "\u{f0405}",
 	context: "\uf2db",
-	brain: "\uf5dc",
+	brain: "\uee9c",
 } as const;
+
+/**
+ * Two spaces after an icon, not one.
+ *
+ * The proportional JetBrainsMono Nerd Font variant (Propo) draws these glyphs
+ * at 1.25–1.9x a cell, so each one bleeds over the cell that follows it and
+ * swallows a single space. Two cells of gap leaves one visible. In the Mono
+ * variant, where every glyph measures exactly one cell, this reads as a
+ * slightly wider gap rather than a missing one.
+ */
+const ICON_GAP = "  ";
 
 const THINKING_COLORS: Record<string, ThemeColor> = {
 	off: "dim",
@@ -214,7 +225,7 @@ export default function piStatusline(pi: ExtensionAPI) {
 	});
 }
 
-/** `model | dir | branch | worktree` on the left, context bar and thinking on the right. */
+/** `model + thinking | context` on the left, `folder | git` on the right. */
 function renderIdentityLine(
 	theme: Theme,
 	footerData: ReadonlyFooterDataProvider,
@@ -228,32 +239,35 @@ function renderIdentityLine(
 	const branch = footerData.getGitBranch();
 	const worktree = getWorktreeLabel(cwd);
 
-	// The thinking level sits beside the model rather than on the right: it says
-	// how the model is being invoked, and the right-hand side belongs to the
-	// context bar.
+	// What the current turn is: which model, at what thinking level, with how
+	// much room left. Kept together on the left.
 	const thinkingLevel = ctx.thinkingLevel;
 	const thinking =
 		!thinkingLevel || thinkingLevel === "off"
 			? ""
 			: theme.fg(
 					THINKING_COLORS[thinkingLevel] ?? "dim",
-					" " + ICONS.brain + " " + thinkingLevel,
+					" " + ICONS.brain + ICON_GAP + thinkingLevel,
 				);
 
 	const left = [
-		c("syntaxType", " " + ICONS.model + " " + (ctx.model?.id ?? "no-model")) + thinking,
-		c("syntaxFunction", ICONS.dir + " " + (cwd.split("/").pop() || cwd)),
-		branch ? c("success", ICONS.branch + " " + branch) : "",
-		worktree ? c("syntaxNumber", ICONS.worktree + " " + worktree) : "",
+		c("syntaxType", " " + ICONS.model + ICON_GAP + (ctx.model?.id ?? "no-model")) + thinking,
+		renderContextBar(theme, ctx, contextFeed),
 	].filter(Boolean);
 
-	const right = renderContextBar(theme, ctx, contextFeed);
+	// Where it is happening, pushed to the far end.
+	const right = [
+		c("syntaxFunction", ICONS.dir + ICON_GAP + (cwd.split("/").pop() || cwd)),
+		branch ? c("success", ICONS.branch + ICON_GAP + branch) : "",
+		worktree ? c("syntaxNumber", ICONS.worktree + ICON_GAP + worktree) : "",
+	].filter(Boolean);
 
 	const leftText = left.join(theme.fg("dim", " | "));
+	const rightText = right.join(theme.fg("dim", " | "));
 	const padding = " ".repeat(
-		Math.max(1, width - visibleWidth(leftText) - visibleWidth(right)),
+		Math.max(1, width - visibleWidth(leftText) - visibleWidth(rightText)),
 	);
-	return truncateToWidth(leftText + padding + right, width);
+	return truncateToWidth(leftText + padding + rightText, width);
 }
 
 /**
@@ -295,7 +309,7 @@ function renderContextBar(
 		theme.fg(barToken, segments.after);
 
 	return (
-		theme.fg("syntaxString", ICONS.context + " ") +
+		theme.fg("syntaxString", ICONS.context + ICON_GAP) +
 		bar +
 		theme.fg(barToken, " " + Math.round(percent) + "%")
 	);

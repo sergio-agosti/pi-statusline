@@ -4,10 +4,17 @@ A status line for [pi](https://pi.dev) in [pi-deck](https://github.com/hisea/pi-
 visual language — that also renders the status entries other extensions publish.
 
 ```
-  claude-opus-5-5  high |  pi-statusline |  main |  feat/status   [db] ━━━━━━━━━─╊─ 76%
-                                                                         76.2%/200k
-  5h ━━╸───── 34% ↺ 2h·19m  │  wk ━━━━━━╸─ 85% ↺ 3d
+  <model> claude-opus-5-5 <brain> medium | <ctx> ━━━━──────╊─ 36%   <dir> pi-statusline | <branch> main
+  5h ━━╸───── 34% ↺ 2h·19m  │  wk ━━━━━━╸─ 85% ↺ 3d  │  mo ━━━━╸─── 62% ↺ 12d
+                                                       ↑1.8M ↓416k R57M $0.687 36.0%/1.0M
 ```
+
+Line 1 is what the turn is — model, thinking level, context — and where it is
+happening, pushed to the far right. Line 2 is what is left, as quota chips.
+Line 3 is what it has cost. Line 2 appears only when at least one extension has
+set a status.
+
+`<model>`, `<dir>`, `<branch>`, `<ctx>` and `<brain>` are Nerd Font glyphs.
 
 ## Why this exists
 
@@ -17,10 +24,10 @@ footer is what draws the **extension status line** — the row that
 status readout in the session: quota/usage windows, the context dumb-zone
 indicator, and anything else an extension publishes.
 
-This package keeps pi-deck's two-line layout and puts that row back
-underneath it. Line 3 appears only when at least one extension has set a
-status, so a session with no such extensions still gets pi-deck's clean
-two-line footer.
+This package keeps pi-deck's layout and puts that row back, as the middle of
+three lines: the status line sits between the identity line and the usage line,
+so the footer reads top to bottom as what the turn is, what is left, then what
+it has cost.
 
 By default each status is rendered **verbatim**, including the colours the
 owning extension applied. That matters: a dumb-zone readout is only useful
@@ -91,7 +98,7 @@ optional.
 {
   "piStatusline": {
     "statusLine": true,
-    "position": "bottom",
+    "position": "top",
     "separator": "  ",
     "order": ["context-tokens", "pi-quotas-usage"],
     "hide": [],
@@ -103,7 +110,7 @@ optional.
 | Key               | Default    | Meaning                                                     |
 | ----------------- | ---------- | ----------------------------------------------------------- |
 | `statusLine`      | `true`     | Render the extension status line at all.                     |
-| `position`        | `"bottom"` | `"bottom"` below the token stats, or `"top"` above them.     |
+| `position`        | `"top"`    | `"top"` above the usage line, `"bottom"` below it.           |
 | `separator`       | `"  "`     | Placed between status entries.                               |
 | `order`           | `[]`       | Keys to place first, in this sequence. Others follow, A→Z.   |
 | `hide`            | `[]`       | Keys to omit.                                                |
@@ -136,8 +143,11 @@ The layout, icons, and colour roles are pi-deck's. The changes:
   built-in footer's accounting.
 - **The `max` thinking level is mapped.** pi-deck's table stopped at `xhigh`,
   so `max` fell back to `dim`. The level is also shown beside the model with a
-  brain glyph rather than on the right, since it describes how the model is
-  being invoked.
+  brain glyph rather than on the right, and the context bar moved next to it,
+  leaving the folder and branch on the right.
+- **Icons are followed by two spaces.** The proportional Nerd Font variant
+  draws these glyphs 1.25–1.9x a cell wide, so each one bleeds over the cell
+  after it and swallows a single space.
 - **A stale context degrades instead of throwing.** The footer's context
   resolves lazily through getters that throw once the extension runner goes
   inactive (session switch, reload). A throw inside the TUI render loop is not
