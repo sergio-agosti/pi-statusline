@@ -364,16 +364,15 @@ describe("structured feeds", () => {
 
 		const line = renderWith(built, statuses).lines[1];
 
-		expect(line).toContain("5h");
-		expect(line).toContain("━━╸─────");
-		expect(line).toContain("34%");
-		expect(line).toContain(" ↺ 2h·19m");
+		// The feed carries remaining percent; chips show used, so they fill up
+		// as the quota is consumed, like the context bar.
+		expect(line).toContain("5h ━━━━━╸── 66% ↺ 2h·19m");
+		expect(line).toContain("7d ━╸────── 15% ↺ 3d");
 		// Chips are spaced, not ruled.
 		expect(line).toContain(" ↺ 2h·19m  7d");
 		expect(line).not.toContain("│");
 		expect(line).not.toContain(" | ");
-		expect(line).toContain("━━━━━━╸─");
-		expect(line).not.toContain("5h: 34%");
+		expect(line).not.toContain("34%");
 	});
 
 	it("keeps other extensions' statuses alongside the chips", () => {

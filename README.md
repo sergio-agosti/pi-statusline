@@ -10,9 +10,9 @@ visual language — that also renders the status entries other extensions publis
 ```
 
 Line 1 is what the turn is — model, thinking level, context — and where it is
-happening, pushed to the far right. Line 2 is what is left, as quota chips.
-Line 3 is what it has cost. Line 2 appears only when at least one extension has
-set a status.
+happening, pushed to the far right. Line 2 is how much of each quota is used,
+as chips that fill up like the context bar. Line 3 is what it has cost. Line 2
+appears only when at least one extension has set a status.
 
 `<model>`, `<dir>`, `<branch>`, `<ctx>` and `<brain>` are Nerd Font glyphs.
 

@@ -415,12 +415,12 @@ function renderQuotaChips(
 }
 
 /**
- * One quota window: `5h ━━╸───── 34% ↺ 2h·19m`.
+ * One quota window: `5h ━━╸───── 34% ↺ 2h·19m`, showing percent used.
  *
- * The value text and reset suffix are published pre-formatted by pi-quotas, so
- * this only places them. A bar is drawn only where the owning extension said
- * one is meaningful — a count pair or a currency pair prints a value a bar
- * would contradict.
+ * The reset suffix, and the value text of a window without a bar, are
+ * published pre-formatted by pi-quotas, so this only places them. A bar is
+ * drawn only where the owning extension said one is meaningful — a count pair
+ * or a currency pair prints a value a bar would contradict.
  */
 function renderQuotaChip(theme: Theme, window: QuotaFeedWindow): string {
 	const color = QUOTA_SEVERITY_COLORS[window.severity];
@@ -428,9 +428,15 @@ function renderQuotaChip(theme: Theme, window: QuotaFeedWindow): string {
 
 	let chip = theme.fg(atRisk ? color : "dim", sanitizeInlineText(window.shortLabel));
 	if (window.barPercent !== null) {
-		chip += " " + theme.fg(color, chipBar(window.barPercent / 100, QUOTA_BAR_WIDTH));
+		// The feed carries remaining percent, and its value text prints the same
+		// number. Both are flipped to used, so the chip fills as the quota is
+		// consumed, the same direction as the context bar.
+		const used = Math.max(0, Math.min(100, 100 - window.barPercent));
+		chip += " " + theme.fg(color, chipBar(used / 100, QUOTA_BAR_WIDTH));
+		chip += " " + theme.fg(color, Math.round(used) + "%");
+	} else {
+		chip += " " + theme.fg(color, sanitizeInlineText(window.valueText));
 	}
-	chip += " " + theme.fg(color, sanitizeInlineText(window.valueText));
 	if (window.limited) chip += theme.fg("error", " !");
 	// The reset suffix carries its own leading space, matching the footer it
 	// came from.
