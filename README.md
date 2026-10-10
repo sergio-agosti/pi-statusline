@@ -4,8 +4,8 @@ A status line for [pi](https://pi.dev) in [pi-deck](https://github.com/hisea/pi-
 visual language — that also renders the status entries other extensions publish.
 
 ```
-  <model> claude-opus-5-5 <brain> medium | <ctx> ━━━━──────╊─ 36%   <dir> pi-statusline | <branch> main
-  5h ━━╸───── 34% ↺ 2h·19m  │  wk ━━━━━━╸─ 85% ↺ 3d  │  mo ━━━━╸─── 62% ↺ 12d
+  <model> claude-opus-5-5 <brain> medium  <ctx> ━━━━──────╊─ 36%   <dir> pi-statusline  <branch> main
+  5h ━━╸───── 34% ↺ 2h·19m  wk ━━━━━━╸─ 85% ↺ 3d  mo ━━━━╸─── 62% ↺ 12d
                                                        ↑1.8M ↓416k R57M $0.687 36.0%/1.0M
 ```
 
@@ -111,7 +111,7 @@ optional.
 | ----------------- | ---------- | ----------------------------------------------------------- |
 | `statusLine`      | `true`     | Render the extension status line at all.                     |
 | `position`        | `"top"`    | `"top"` above the usage line, `"bottom"` below it.           |
-| `separator`       | `"  "`     | Placed between status entries.                               |
+| `separator`       | `"  "`     | Placed between status entries and quota chips.               |
 | `order`           | `[]`       | Keys to place first, in this sequence. Others follow, A→Z.   |
 | `hide`            | `[]`       | Keys to omit.                                                |
 | `structuredFeeds` | `true`     | Draw the structured feeds instead of their status text.      |

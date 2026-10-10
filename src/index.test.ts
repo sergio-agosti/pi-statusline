@@ -367,7 +367,10 @@ describe("structured feeds", () => {
 		expect(line).toContain("━━╸─────");
 		expect(line).toContain("34%");
 		expect(line).toContain(" ↺ 2h·19m");
-		expect(line).toContain("│");
+		// Chips are spaced, not ruled.
+		expect(line).toContain(" ↺ 2h·19m  7d");
+		expect(line).not.toContain("│");
+		expect(line).not.toContain(" | ");
 		expect(line).toContain("━━━━━━╸─");
 		expect(line).not.toContain("5h: 34%");
 	});

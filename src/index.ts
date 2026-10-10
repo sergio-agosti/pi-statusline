@@ -9,7 +9,7 @@
  * pi-deck's two-line layout and adds the status line back underneath it.
  *
  *   line 1   model + thinking | context             folder | git
- *   line 2   5h ━━╸───── 34% ↺ 2h·19m  │  wk ━━━━━━╸─ 85% ↺ 3d
+ *   line 2   5h ━━╸───── 34% ↺ 2h·19m  wk ━━━━━━╸─ 85% ↺ 3d
  *   line 3                              ↑in ↓out Rcache Wcache $cost 45%/200k
  *
  * Line 2 appears only when at least one extension has set a status.
@@ -86,7 +86,13 @@ const THINKING_COLORS: Record<string, ThemeColor> = {
 
 const CONTEXT_BAR_WIDTH = 12;
 const QUOTA_BAR_WIDTH = 8;
-const CHIP_SEPARATOR = "  │  ";
+
+/**
+ * Between segments on the identity line, and the default between status
+ * entries. Plain spaces rather than a rule: every segment already opens with an
+ * icon, so a bar between them is furniture.
+ */
+const SEGMENT_GAP = "  ";
 
 /**
  * pi-token-count owns the dumb-zone thresholds, so its verdict is used as given
@@ -262,8 +268,8 @@ function renderIdentityLine(
 		worktree ? c("syntaxNumber", ICONS.worktree + ICON_GAP + worktree) : "",
 	].filter(Boolean);
 
-	const leftText = left.join(theme.fg("dim", " | "));
-	const rightText = right.join(theme.fg("dim", " | "));
+	const leftText = left.join(theme.fg("dim", SEGMENT_GAP));
+	const rightText = right.join(theme.fg("dim", SEGMENT_GAP));
 	const padding = " ".repeat(
 		Math.max(1, width - visibleWidth(leftText) - visibleWidth(rightText)),
 	);
@@ -396,7 +402,9 @@ function renderQuotaChips(
 
 	superseded.add(quotas.statusKey);
 	const chips = quotas.windows.map((window) => renderQuotaChip(theme, window));
-	return chips.join(theme.fg("dim", CHIP_SEPARATOR));
+	// The same gap the status entries use, so the whole line spaces uniformly and
+	// the separator setting governs all of it.
+	return chips.join(theme.fg("dim", settings.separator));
 }
 
 /**
