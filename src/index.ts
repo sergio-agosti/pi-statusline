@@ -33,6 +33,8 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import {
 	buildStatusLine,
 	chipBar,
+	chipLabel,
+	isModelLabel,
 	collectUsageTotals,
 	contextBarSegments,
 	formatTokens,
@@ -432,25 +434,57 @@ function renderQuotaChips(
 	}
 
 	superseded.add(quotas.statusKey);
-	const chips = quotas.windows.map((window) => renderQuotaChip(theme, window));
+	const { windows } = quotas;
 	// The same gap the status entries use, so the whole line spaces uniformly and
 	// the separator setting governs all of it.
-	return chips.join(theme.fg("dim", settings.separator));
+	const separator = theme.fg("dim", settings.separator);
+	return windows
+		.map((window, index) => {
+			// Windows that reset together print the reset once, after the last.
+			const showReset = window.resetText !== windows[index + 1]?.resetText;
+			// A model-scoped window is part of the allowance before it, so it joins
+			// that chip after a slash, with no label of its own: `wk … 50% / … 0%`.
+			if (isSubWindow(window, windows[index - 1])) {
+				return theme.fg("dim", " /") + renderQuotaChip(theme, window, showReset, false);
+			}
+			return (index > 0 ? separator : "") + renderQuotaChip(theme, window, showReset, true);
+		})
+		.join("");
 }
 
 /**
- * One quota window: `5h ━━╸───── 34% <reset> 2h·19m`, showing percent used.
+ * Whether a window is a model-scoped slice of the one before it: same kind,
+ * same reset, and tagged with a model name.
+ */
+function isSubWindow(window: QuotaFeedWindow, previous: QuotaFeedWindow | undefined): boolean {
+	return (
+		previous !== undefined &&
+		window.kind === previous.kind &&
+		window.resetText === previous.resetText &&
+		isModelLabel(window.shortLabel)
+	);
+}
+
+/**
+ * One quota window: `5h ━━╾───── 34% <reset> 2h·19m`, showing percent used.
  *
  * The reset suffix, and the value text of a window without a bar, are
  * published pre-formatted by pi-quotas, so this only places them. A bar is
  * drawn only where the owning extension said one is meaningful — a count pair
  * or a currency pair prints a value a bar would contradict.
  */
-function renderQuotaChip(theme: Theme, window: QuotaFeedWindow): string {
+function renderQuotaChip(
+	theme: Theme,
+	window: QuotaFeedWindow,
+	showReset: boolean,
+	showLabel: boolean,
+): string {
 	const color = QUOTA_SEVERITY_COLORS[window.severity];
 	const atRisk = window.severity !== "none";
 
-	let chip = theme.fg(atRisk ? color : "dim", sanitizeInlineText(window.shortLabel));
+	let chip = showLabel
+		? theme.fg(atRisk ? color : "dim", chipLabel(sanitizeInlineText(window.shortLabel)))
+		: "";
 	if (window.barPercent !== null) {
 		// The feed carries remaining percent, and its value text prints the same
 		// number. Both are flipped to used, so the chip fills as the quota is
@@ -466,7 +500,7 @@ function renderQuotaChip(theme: Theme, window: QuotaFeedWindow): string {
 	// came from. Its ↺ is not in JetBrains Mono, so the terminal squeezes a
 	// fallback glyph into one cell; it is swapped for a Nerd Font icon the
 	// width of the others. A suffix without the marker passes through as is.
-	if (window.resetText) {
+	if (showReset && window.resetText) {
 		const resetText = sanitizeInlineText(window.resetText).replace(
 			/^ ↺ /u,
 			" " + ICONS.reset + ICON_GAP,

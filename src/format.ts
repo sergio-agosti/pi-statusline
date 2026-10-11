@@ -138,6 +138,29 @@ export function contextBarSegments(
 }
 
 /**
+ * Whether a quota window's short label is a model name, which pi-quotas uses
+ * for a model-scoped window: a lowercase word longer than the standard tags.
+ */
+export function isModelLabel(label: string): boolean {
+	return label.length > 3 && /^[a-z]+$/u.test(label);
+}
+
+/**
+ * A quota chip's label, kept to the two letters of its neighbours.
+ *
+ * pi-quotas tags the standard windows `5h`, `wk`, `mo` and so on, but tags a
+ * model-scoped window with the lowercased model name: `fable`, `opus`. Those
+ * collapse to their first letter and the next consonant — `fb`, `op`, `sn` —
+ * which keeps the letters that carry the word. Any other label, which
+ * pi-quotas passes through in the provider's own case, is left alone.
+ */
+export function chipLabel(label: string): string {
+	if (!isModelLabel(label)) return label;
+	const consonant = label.slice(1).match(/[^aeiou]/u)?.[0];
+	return label[0] + (consonant ?? label[1]);
+}
+
+/**
  * A quota chip's bar: filled to `fillRatio` with a cap glyph at the fill
  * boundary, so a barely-used allowance still shows a start rather than a flat
  * track.

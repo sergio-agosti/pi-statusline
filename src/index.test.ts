@@ -400,6 +400,43 @@ describe("structured feeds", () => {
 		expect(renderWith(built, statuses).lines[1]).toContain("66% resets 2h");
 	});
 
+	it("shows a shared reset once, after the last window that shares it", () => {
+		const statuses = new Map([["pi-quotas-usage", "wk: 50%"]]);
+		const built = build(statuses);
+		const week = { ...quotasFeed.windows[1], severity: "none", resetText: " ↺ 10h·17m" };
+		built.bus.emit(QUOTAS_USAGE_UPDATED_EVENT, {
+			statusKey: "pi-quotas-usage",
+			windows: [
+				quotasFeed.windows[0],
+				{ ...week, shortLabel: "wk", barPercent: 50 },
+				{ ...week, shortLabel: "fable", barPercent: 100 },
+			],
+		});
+
+		const line = renderWith(built, statuses).lines[1]!;
+		// A model-scoped window is part of the weekly allowance and resets with
+		// it, so it joins the weekly chip after a slash, without its own label.
+		expect(line).toContain(`wk ━━━━╾─── 50% / ──────── 0% ${RESET_ICON} 10h·17m`);
+		expect(line).not.toContain("fb");
+		expect(line.split(RESET_ICON)).toHaveLength(3);
+	});
+
+	it("keeps the label on a model window that does not follow its weekly one", () => {
+		const statuses = new Map([["pi-quotas-usage", "fable: 0%"]]);
+		const built = build(statuses);
+		built.bus.emit(QUOTAS_USAGE_UPDATED_EVENT, {
+			statusKey: "pi-quotas-usage",
+			windows: [
+				quotasFeed.windows[0],
+				{ ...quotasFeed.windows[1], shortLabel: "fable", barPercent: 100 },
+			],
+		});
+
+		const line = renderWith(built, statuses).lines[1]!;
+		expect(line).toContain("  fb ──────── 0%");
+		expect(line).not.toContain(" / ");
+	});
+
 	it("keeps other extensions' statuses alongside the chips", () => {
 		const statuses = new Map([
 			["pi-quotas-usage", "5h: 34%"],

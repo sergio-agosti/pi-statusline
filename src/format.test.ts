@@ -4,6 +4,7 @@ import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import {
 	buildStatusLine,
 	chipBar,
+	chipLabel,
 	collectUsageTotals,
 	contextBarSegments,
 	formatTokens,
@@ -251,5 +252,32 @@ describe("sanitizeInlineText", () => {
 		// A chip's reset suffix carries a leading space on purpose.
 		expect(sanitizeInlineText(" ↺ 2h·19m")).toBe(" ↺ 2h·19m");
 		expect(sanitizeInlineText("a\nb\tc")).toBe("a b c");
+	});
+});
+
+describe("chipLabel", () => {
+	it("keeps the provider's short tags", () => {
+		expect(chipLabel("5h")).toBe("5h");
+		expect(chipLabel("wk")).toBe("wk");
+		expect(chipLabel("mo")).toBe("mo");
+	});
+
+	it("collapses a model name to its first letter and next consonant", () => {
+		// Model-scoped windows are tagged with the model name, which is long
+		// beside the two-letter tags.
+		expect(chipLabel("fable")).toBe("fb");
+		expect(chipLabel("opus")).toBe("op");
+		expect(chipLabel("sonnet")).toBe("sn");
+	});
+
+	it("leaves a provider's own label as published", () => {
+		// Labels pi-quotas has no tag for pass through in their own case; only the
+		// lowercased model names are collapsed.
+		expect(chipLabel("Spend cap")).toBe("Spend cap");
+		expect(chipLabel("Credits")).toBe("Credits");
+	});
+
+	it("falls back to the first two letters when there is no later consonant", () => {
+		expect(chipLabel("aeiou")).toBe("ae");
 	});
 });
