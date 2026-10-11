@@ -10,7 +10,7 @@
  *
  *   line 1   model + thinking | context             git | folder
  *   line 2   5h ━━╾───── 34% ↺ 2h·19m  wk ━━━━━━╾─ 85% ↺ 3d
- *   line 3                              ↑in ↓out Rcache Wcache $cost 45%/200k
+ *   line 3   ↑in ↓out Rcache Wcache $cost 45%/200k
  *
  * Line 2 appears only when at least one extension has set a status.
  *
@@ -356,7 +356,7 @@ function renderContextBar(
 	);
 }
 
-/** Right-aligned, dimmed token totals and context percentage. */
+/** Left-aligned, dimmed token totals and context percentage. */
 function renderStatsLine(
 	theme: Theme,
 	ctx: ExtensionContext,
@@ -381,11 +381,7 @@ function renderStatsLine(
 				: contextText;
 	parts.push(contextColored);
 
-	const stats = parts.join(" ");
-	// Dim the padding and the uncoloured parts separately: the context segment
-	// may end in a reset that would clear an outer dim wrapper.
-	const padding = " ".repeat(Math.max(0, width - visibleWidth(stats)));
-	return truncateToWidth(theme.fg("dim", padding) + theme.fg("dim", stats), width);
+	return truncateToWidth(theme.fg("dim", parts.join(" ")), width);
 }
 
 /**

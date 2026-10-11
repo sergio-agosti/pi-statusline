@@ -6,7 +6,7 @@ visual language — that also renders the status entries other extensions publis
 ```
   <model> claude-opus-5-5 <brain> ━━━───  <ctx> ━━━━──────·─ 36%·360k/1.0M  <branch> main  <dir> pi-statusline
   5h ━━╾───── 34% <reset> 2h·19m  wk ━━━━━━╾─ 85% <reset> 3d  mo ━━━━╾─── 62% <reset> 12d
-                                                       ↑1.8M ↓416k R57M $0.687 36.0%/1.0M
+  ↑1.8M ↓416k R57M $0.687 36.0%/1.0M
 ```
 
 Line 1 is what the turn is — model, thinking level, context — and where it is

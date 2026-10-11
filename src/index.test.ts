@@ -716,6 +716,8 @@ describe("core lines", () => {
 		expect(line).toContain("↑150");
 		expect(line).toContain("R400");
 		expect(line).toContain("$0.500");
+		// Left-aligned, under the start of the lines above.
+		expect(line!.startsWith("↑150")).toBe(true);
 	});
 });
 
