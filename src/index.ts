@@ -278,8 +278,10 @@ function renderIdentityLine(
 
 	const leftText = left.join(theme.fg("dim", SEGMENT_GAP));
 	const rightText = right.join(theme.fg("dim", SEGMENT_GAP));
+	// Never closer than the gap between segments, so a crowded line still
+	// spaces evenly; the right end is truncated instead.
 	const padding = " ".repeat(
-		Math.max(1, width - visibleWidth(leftText) - visibleWidth(rightText)),
+		Math.max(SEGMENT_GAP.length, width - visibleWidth(leftText) - visibleWidth(rightText)),
 	);
 	return truncateToWidth(leftText + padding + rightText, width);
 }

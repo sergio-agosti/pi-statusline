@@ -546,6 +546,20 @@ describe("core lines", () => {
 		expect(line).toContain("main");
 	});
 
+	it("keeps the segment gap between the halves when the line is too narrow", () => {
+		const statuses = new Map<string, string>();
+		const built = createContext({
+			session: { entries: [], sessionId: "s1", leafId: null },
+			statuses,
+			cwd: workDir,
+			percent: 7,
+			tokens: 14200,
+		});
+
+		const line = renderWith(built, statuses, 60).lines[0]!;
+		expect(line).toContain(`/200k  ${BRANCH_ICON} main`);
+	});
+
 	it("puts the branch before the folder, so the folder ends the line", () => {
 		const statuses = new Map<string, string>();
 		const built = createContext({
