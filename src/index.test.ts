@@ -359,6 +359,15 @@ describe("structured feeds", () => {
 		expect(lines).toHaveLength(2);
 	});
 
+	it("colours the context icon with the bar's dumb-zone verdict", () => {
+		const statuses = new Map([["context-tokens", "152,340 tok"]]);
+		const built = build(statuses);
+		built.bus.emit(CONTEXT_TOKENS_UPDATED_EVENT, { ...contextFeed, severity: "dumb" });
+
+		const { theme } = renderWith(built, statuses);
+		expect(theme.calls.find((call) => call.text === `${CONTEXT_ICON} `)?.token).toBe("error");
+	});
+
 	it("renders quota windows as chips and drops the raw status", () => {
 		const statuses = new Map([["pi-quotas-usage", "5h: 34% · 7d: 85%"]]);
 		const built = build(statuses);

@@ -305,8 +305,8 @@ function renderThinking(theme: Theme, level: string): string {
  *
  * The fill is the used fraction and the tick marks where the dumb zone starts,
  * both measured against the same window, so the two are directly comparable.
- * Colour comes from pi-token-count's verdict when it is available, and from
- * absolute fullness otherwise.
+ * Colour, icon included, comes from pi-token-count's verdict when it is
+ * available, and from absolute fullness otherwise.
  */
 function renderContextBar(
 	theme: Theme,
@@ -340,7 +340,7 @@ function renderContextBar(
 		theme.fg(barToken, segments.after);
 
 	return (
-		theme.fg("syntaxString", ICONS.context + ICON_GAP) +
+		theme.fg(barToken, ICONS.context + ICON_GAP) +
 		bar +
 		theme.fg(barToken, " " + Math.round(percent) + "%") +
 		// Unknown right after compaction, until the next response reports usage.
