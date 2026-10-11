@@ -286,9 +286,9 @@ function renderIdentityLine(
  * The thinking level as a bar in the same style as the context and quota bars:
  * one cell per level, `━━━━──` at high.
  *
- * Each lit cell takes its own level's colour, so a higher level shows more of
- * the gradient, and the unlit track stays dim to show the headroom. A level the
- * table does not know, from a newer pi, falls back to its name.
+ * The lit run takes the current level's colour, like the brain beside it, and
+ * the unlit track stays dim to show the headroom. A level the table does not
+ * know, from a newer pi, falls back to its name.
  */
 function renderThinking(theme: Theme, level: string): string {
 	const color = THINKING_COLORS[level] ?? "dim";
@@ -296,11 +296,8 @@ function renderThinking(theme: Theme, level: string): string {
 	const lit = THINKING_LEVELS.indexOf(level as (typeof THINKING_LEVELS)[number]);
 	if (lit < 0) return icon + theme.fg(color, level);
 
-	const cells = THINKING_LEVELS.slice(0, lit + 1).map((litLevel) =>
-		theme.fg(THINKING_COLORS[litLevel]!, "━"),
-	);
 	const unlit = "─".repeat(THINKING_LEVELS.length - lit - 1);
-	return icon + cells.join("") + (unlit ? theme.fg("dim", unlit) : "");
+	return icon + theme.fg(color, "━".repeat(lit + 1)) + (unlit ? theme.fg("dim", unlit) : "");
 }
 
 /**

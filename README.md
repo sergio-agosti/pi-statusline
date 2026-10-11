@@ -145,9 +145,9 @@ The layout, icons, and colour roles are pi-deck's. The changes:
   built-in footer's accounting.
 - **The `max` thinking level is mapped.** pi-deck's table stopped at `xhigh`,
   so `max` fell back to `dim`. The level is also shown beside the model, as a
-  brain glyph and a bar filled to the level, with each cell in its own
-  level's colour, rather than as a word on the right. The context bar moved
-  next to it, leaving the branch and folder on the right.
+  brain glyph and a bar filled to the level in that level's colour, rather
+  than as a word on the right. The context bar moved next to it, leaving the
+  branch and folder on the right.
 - **Icons are the same width.** Ghostty and the proportional Nerd Font variant
   draw icons at their natural width, so each spills over the space after it.
   pi-deck's set ranged from 1.25 to 1.9 cells, which made the gaps uneven; the

@@ -545,9 +545,8 @@ describe("core lines", () => {
 		// One cell per level, minimal through max; high is the fourth.
 		expect(lines[0]).toContain(`claude-opus-5-5  ${BRAIN} ━━━━──`);
 		expect(lines[0]).not.toContain("high");
-		// Each lit cell in its own level's colour, so the bar warms as it fills.
-		const lit = theme.calls.filter((call) => call.text === "━").map((call) => call.token);
-		expect(lit).toEqual(["thinkingMinimal", "thinkingLow", "thinkingMedium", "thinkingHigh"]);
+		// The whole lit run in the current level's colour.
+		expect(theme.calls.find((call) => call.text === "━━━━")?.token).toBe("thinkingHigh");
 		expect(theme.calls.some((call) => call.token === "dim" && call.text === "──")).toBe(true);
 		expect(theme.calls.find((call) => call.text === `${BRAIN} `)?.token).toBe("thinkingHigh");
 	});
@@ -563,7 +562,7 @@ describe("core lines", () => {
 
 		const { lines, theme } = renderWith(built, statuses);
 		expect(lines[0]).toContain(`${BRAIN} ━━━━━━ `);
-		expect(theme.calls.filter((call) => call.text === "━").at(-1)?.token).toBe("thinkingMax");
+		expect(theme.calls.find((call) => call.text === "━━━━━━")?.token).toBe("thinkingMax");
 	});
 
 	it("falls back to the level name for a level it does not know", () => {
