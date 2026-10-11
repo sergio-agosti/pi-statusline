@@ -204,7 +204,7 @@ describe("contextBarSegments", () => {
 		// 80% of 12 cells is cell 10, which is also where 160k of 200k falls.
 		expect(contextBarSegments(0.8, 12, { start: 160000, window: 200000 })).toEqual({
 			before: "━━━━━━━━━━",
-			tick: "╊",
+			tick: "·",
 			after: "─",
 		});
 	});
@@ -222,20 +222,22 @@ describe("contextBarSegments", () => {
 	it("clamps a threshold past the end of the window onto the bar", () => {
 		const segments = contextBarSegments(0, 4, { start: 400000, window: 200000 });
 		expect(segments.before).toBe("───");
-		expect(segments.tick).toBe("╊");
+		expect(segments.tick).toBe("·");
 		expect(segments.after).toBe("");
 	});
 });
 
 describe("chipBar", () => {
-	it("caps the fill so a short bar still reads as a bar", () => {
-		expect(chipBar(0.34, 8)).toBe("━━╸─────");
-		expect(chipBar(0.85, 8)).toBe("━━━━━━╸─");
+	it("caps the fill with a glyph that joins the empty track", () => {
+		// ╸ (heavy left half) leaves its right half blank, which reads as a gap
+		// between the fill and the track. ╾ continues it as a light line.
+		expect(chipBar(0.34, 8)).toBe("━━╾─────");
+		expect(chipBar(0.85, 8)).toBe("━━━━━━╾─");
 	});
 
-	it("rounds the fill down so it never overstates what is left", () => {
+	it("rounds the fill down so a full bar means the allowance is used up", () => {
 		// 0.99 of 8 is 7.92; rounding up would draw a full bar.
-		expect(chipBar(0.99, 8)).toBe("━━━━━━━╸");
+		expect(chipBar(0.99, 8)).toBe("━━━━━━━╾");
 	});
 
 	it("handles the empty and full ends", () => {

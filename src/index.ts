@@ -9,7 +9,7 @@
  * pi-deck's two-line layout and adds the status line back underneath it.
  *
  *   line 1   model + thinking | context             git | folder
- *   line 2   5h ━━╸───── 34% ↺ 2h·19m  wk ━━━━━━╸─ 85% ↺ 3d
+ *   line 2   5h ━━╾───── 34% ↺ 2h·19m  wk ━━━━━━╾─ 85% ↺ 3d
  *   line 3                              ↑in ↓out Rcache Wcache $cost 45%/200k
  *
  * Line 2 appears only when at least one extension has set a status.

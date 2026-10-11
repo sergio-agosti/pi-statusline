@@ -82,8 +82,11 @@ export function collectUsageTotals(entries: readonly SessionEntry[]): UsageTotal
 	return totals;
 }
 
-/** The glyph marking where the dumb zone starts, from pi-token-count. */
-const DUMB_ZONE_TICK = "╊";
+/**
+ * The glyph marking where the dumb zone starts, from pi-token-count. A dot
+ * rather than a cross, so it marks the threshold without crowding the bar.
+ */
+const DUMB_ZONE_TICK = "·";
 
 /** A context bar split around the dumb-zone tick so each part can be coloured. */
 export interface ContextBarSegments {
@@ -136,17 +139,19 @@ export function contextBarSegments(
 
 /**
  * A quota chip's bar: filled to `fillRatio` with a cap glyph at the fill
- * boundary, so an almost-empty allowance still reads as a bar rather than as
- * blank space.
+ * boundary, so a barely-used allowance still shows a start rather than a flat
+ * track.
  *
- * The fill rounds down, never up, so the bar cannot overstate how much
- * allowance is left.
+ * The fill rounds down, never up, so the bar is full only once the allowance
+ * is used up.
  */
 export function chipBar(fillRatio: number, width: number): string {
 	const filled = Math.floor(Math.max(0, Math.min(1, fillRatio)) * width);
 	if (filled >= width) return "━".repeat(width);
 	if (filled <= 0) return "─".repeat(width);
-	return "━".repeat(filled) + "╸" + "─".repeat(width - filled - 1);
+	// ╾ rather than ╸: its light right half joins the empty track, where ╸
+	// leaves a blank half-cell that reads as a gap.
+	return "━".repeat(filled) + "╾" + "─".repeat(width - filled - 1);
 }
 
 export interface StatusLineOptions {

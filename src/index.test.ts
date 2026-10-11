@@ -353,7 +353,7 @@ describe("structured feeds", () => {
 		const lines = renderWith(built, statuses).lines;
 
 		// 80% of 12 cells is cell 10, which is also where 160k of 200k falls.
-		expect(lines[0]).toContain("━━━━━━━━━━╊─");
+		expect(lines[0]).toContain("━━━━━━━━━━·─");
 		expect(lines.join("\n")).not.toContain("152,340 tok");
 		// Nothing left for the status line.
 		expect(lines).toHaveLength(2);
@@ -377,8 +377,8 @@ describe("structured feeds", () => {
 
 		// The feed carries remaining percent; chips show used, so they fill up
 		// as the quota is consumed, like the context bar.
-		expect(line).toContain(`5h ━━━━━╸── 66% ${RESET_ICON} 2h·19m`);
-		expect(line).toContain(`7d ━╸────── 15% ${RESET_ICON} 3d`);
+		expect(line).toContain(`5h ━━━━━╾── 66% ${RESET_ICON} 2h·19m`);
+		expect(line).toContain(`7d ━╾────── 15% ${RESET_ICON} 3d`);
 		// The font has no ↺, so the fallback glyph renders squashed; it is swapped
 		// for a Nerd Font icon the same width as the others.
 		expect(line).not.toContain("↺");
@@ -423,7 +423,7 @@ describe("structured feeds", () => {
 		const lines = renderWith(built, statuses).lines;
 		expect(lines[1]).toContain("152,340 tok");
 		expect(lines[1]).toContain("5h: 34%");
-		expect(lines[0]).not.toContain("╊");
+		expect(lines[0]).not.toMatch(/[━─]·|·[━─]/u);
 	});
 
 	it("ignores a context feed describing a different window", () => {
@@ -435,7 +435,7 @@ describe("structured feeds", () => {
 		});
 
 		const lines = renderWith(built, statuses).lines;
-		expect(lines[0]).not.toContain("╊");
+		expect(lines[0]).not.toMatch(/[━─]·|·[━─]/u);
 		// The readout is not lost while the bar cannot show it.
 		expect(lines[1]).toContain("152,340 tok");
 	});
@@ -488,7 +488,7 @@ describe("structured feeds", () => {
 		built.bus.emit(QUOTAS_USAGE_UPDATED_EVENT, quotasFeed);
 
 		const lines = renderWith(built, statuses).lines;
-		expect(lines[0]).not.toContain("╊");
+		expect(lines[0]).not.toMatch(/[━─]·|·[━─]/u);
 		expect(lines[1]).toContain("152,340 tok");
 		expect(lines[1]).toContain("5h: 34%");
 	});
