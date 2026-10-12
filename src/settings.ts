@@ -20,9 +20,9 @@ export interface StatuslineSettings {
 	/** Render the extension status line at all. */
 	statusLine: boolean;
 	/**
-	 * Whether the status line sits above the usage line or below it. Above by
-	 * default, so the footer reads top to bottom as what the turn is, what is
-	 * left, then what it has cost.
+	 * Whether the status line sits above the token line or below it. Above by
+	 * default, so the footer reads top to bottom as where the session is, what
+	 * the turn is, what is left, then what it has cost.
 	 */
 	position: StatusLinePosition;
 	/** Placed between status entries. */

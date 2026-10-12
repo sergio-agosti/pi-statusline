@@ -6,13 +6,14 @@
  * draws the extension status line, so installing pi-deck silently hides every
  * `setStatus` readout in the session — usage quotas, the context dumb-zone
  * indicator, and anything else an extension publishes. This extension keeps
- * pi-deck's two-line layout and adds the status line back underneath it.
+ * pi-deck's look and adds the status line back underneath it.
  *
- *   line 1   model + thinking | context             git | folder
- *   line 2   5h ━━╾───── 34% ↺ 2h·19m  wk ━━━━━━╾─ 85% ↺ 3d
- *   line 3   ↑in ↓out Rcache Wcache $cost 45%/200k
+ *   line 1   folder  branch  worktree
+ *   line 2   model  thinking  context
+ *   line 3   5h ━━╾───── 34% ↺ 2h·19m  wk ━━━━━━╾─ 85% ↺ 3d
+ *   line 4   ↑in ↓out Rcache Wcache $cost 45%/200k
  *
- * Line 2 appears only when at least one extension has set a status.
+ * Line 3 appears only when at least one extension has set a status.
  *
  * Extensions that publish a structured feed on `pi.events` — pi-token-count and
  * pi-quotas — get their data drawn rather than printed: the dumb-zone threshold
@@ -100,7 +101,7 @@ const CONTEXT_BAR_WIDTH = 12;
 const QUOTA_BAR_WIDTH = 8;
 
 /**
- * Between segments on the identity line, and the default between status
+ * Between segments on the location and turn lines, and the default between status
  * entries. Plain spaces rather than a rule: every segment already opens with an
  * icon, so a bar between them is furniture.
  */
@@ -225,7 +226,8 @@ export default function piStatusline(pi: ExtensionAPI) {
 				const contextFeed = applicableContextFeed(ctx, feeds.context, settings);
 
 				const lines = [
-					renderIdentityLine(theme, footerData, ctx, width, contextFeed),
+					renderLocationLine(theme, footerData, ctx, width),
+					renderTurnLine(theme, ctx, width, contextFeed),
 				];
 
 				const statusLine =
@@ -243,13 +245,12 @@ export default function piStatusline(pi: ExtensionAPI) {
 	});
 }
 
-/** `model + thinking | context` on the left, `git | folder` on the right. */
-function renderIdentityLine(
+/** Where the session is happening: `folder  branch  worktree`. */
+function renderLocationLine(
 	theme: Theme,
 	footerData: ReadonlyFooterDataProvider,
 	ctx: ExtensionContext,
 	width: number,
-	contextFeed: ContextFeed | undefined,
 ): string {
 	const c = (token: ThemeColor, text: string) => theme.fg(token, text);
 
@@ -257,33 +258,33 @@ function renderIdentityLine(
 	const branch = footerData.getGitBranch();
 	const worktree = getWorktreeLabel(cwd);
 
-	// What the current turn is: which model, at what thinking level, with how
-	// much room left. Kept together on the left.
+	const segments = [
+		c("syntaxFunction", ICONS.dir + ICON_GAP + (cwd.split("/").pop() || cwd)),
+		branch ? c("success", ICONS.branch + ICON_GAP + branch) : "",
+		worktree ? c("syntaxNumber", ICONS.worktree + ICON_GAP + worktree) : "",
+	].filter(Boolean);
+
+	return truncateToWidth(segments.join(theme.fg("dim", SEGMENT_GAP)), width);
+}
+
+/** What the current turn is: `model  thinking  context`. */
+function renderTurnLine(
+	theme: Theme,
+	ctx: ExtensionContext,
+	width: number,
+	contextFeed: ContextFeed | undefined,
+): string {
 	const thinkingLevel = ctx.thinkingLevel;
 	const thinking =
 		!thinkingLevel || thinkingLevel === "off" ? "" : renderThinking(theme, thinkingLevel);
 
-	const left = [
-		c("syntaxType", ICONS.model + ICON_GAP + (ctx.model?.id ?? "no-model")),
+	const segments = [
+		theme.fg("syntaxType", ICONS.model + ICON_GAP + (ctx.model?.id ?? "no-model")),
 		thinking,
 		renderContextBar(theme, ctx, contextFeed),
 	].filter(Boolean);
 
-	// Where it is happening, pushed to the far end.
-	const right = [
-		branch ? c("success", ICONS.branch + ICON_GAP + branch) : "",
-		worktree ? c("syntaxNumber", ICONS.worktree + ICON_GAP + worktree) : "",
-		c("syntaxFunction", ICONS.dir + ICON_GAP + (cwd.split("/").pop() || cwd)),
-	].filter(Boolean);
-
-	const leftText = left.join(theme.fg("dim", SEGMENT_GAP));
-	const rightText = right.join(theme.fg("dim", SEGMENT_GAP));
-	// Never closer than the gap between segments, so a crowded line still
-	// spaces evenly; the right end is truncated instead.
-	const padding = " ".repeat(
-		Math.max(SEGMENT_GAP.length, width - visibleWidth(leftText) - visibleWidth(rightText)),
-	);
-	return truncateToWidth(leftText + padding + rightText, width);
+	return truncateToWidth(segments.join(theme.fg("dim", SEGMENT_GAP)), width);
 }
 
 /**

@@ -153,7 +153,7 @@ afterEach(() => {
 });
 
 describe("status line rendering", () => {
-	it("adds a second line carrying every extension status", () => {
+	it("adds a line carrying every extension status", () => {
 		const statuses = new Map([
 			["context-tokens", "160.0k ◆"],
 			["pi-quotas-usage", "5h: 85%/93% (2h)"],
@@ -166,12 +166,12 @@ describe("status line rendering", () => {
 
 		const lines = renderWith(built, statuses).lines;
 
-		expect(lines).toHaveLength(3);
-		expect(lines[1]).toContain("160.0k ◆");
-		expect(lines[1]).toContain("5h: 85%/93% (2h)");
+		expect(lines).toHaveLength(4);
+		expect(lines[2]).toContain("160.0k ◆");
+		expect(lines[2]).toContain("5h: 85%/93% (2h)");
 	});
 
-	it("omits the second line when no extension published a status", () => {
+	it("omits the status line when no extension published a status", () => {
 		const statuses = new Map<string, string>();
 		const built = createContext({
 			session: { entries: [], sessionId: "s1", leafId: null },
@@ -179,7 +179,7 @@ describe("status line rendering", () => {
 			cwd: workDir,
 		});
 
-		expect(renderWith(built, statuses).lines).toHaveLength(2);
+		expect(renderWith(built, statuses).lines).toHaveLength(3);
 	});
 
 	it("keeps each status's own colour codes", () => {
@@ -190,7 +190,7 @@ describe("status line rendering", () => {
 			cwd: workDir,
 		});
 
-		const line = renderWith(built, statuses).lines[1];
+		const line = renderWith(built, statuses).lines[2];
 		expect(line).toContain(RED);
 		expect(line).toContain(RESET);
 	});
@@ -211,7 +211,7 @@ describe("status line rendering", () => {
 		}
 	});
 
-	it("puts the status line above the stats line by default", () => {
+	it("reads where, then what the turn is, the statuses, and what it cost", () => {
 		const statuses = new Map([["context-tokens", "160.0k ◆"]]);
 		const built = createContext({
 			session: {
@@ -224,9 +224,13 @@ describe("status line rendering", () => {
 		});
 
 		const lines = renderWith(built, statuses).lines;
-		expect(lines).toHaveLength(3);
-		expect(lines[1]).toContain("160.0k ◆");
-		expect(lines[2]).toContain("↑100");
+		expect(lines).toHaveLength(4);
+		expect(lines[0]).toMatch(new RegExp(`^${DIR_ICON} \\S+  ${BRANCH_ICON} main$`, "u"));
+		expect(lines[1]).toMatch(new RegExp(`^${MODEL_ICON} `, "u"));
+		expect(lines[1]).toContain(CONTEXT_ICON);
+		expect(lines[1]).not.toContain("main");
+		expect(lines[2]).toContain("160.0k ◆");
+		expect(lines[3]).toContain("↑100");
 	});
 
 	it("puts the status line below the stats line when configured to", () => {
@@ -247,9 +251,9 @@ describe("status line rendering", () => {
 		});
 
 		const lines = renderWith(built, statuses).lines;
-		expect(lines).toHaveLength(3);
-		expect(lines[1]).toContain("↑100");
-		expect(lines[2]).toContain("160.0k ◆");
+		expect(lines).toHaveLength(4);
+		expect(lines[2]).toContain("↑100");
+		expect(lines[3]).toContain("160.0k ◆");
 	});
 
 	it("hides configured keys", () => {
@@ -268,7 +272,7 @@ describe("status line rendering", () => {
 			cwd: workDir,
 		});
 
-		const line = renderWith(built, statuses).lines[1];
+		const line = renderWith(built, statuses).lines[2];
 		expect(line).toContain("160.0k ◆");
 		expect(line).not.toContain("skip me");
 	});
@@ -286,7 +290,7 @@ describe("status line rendering", () => {
 			cwd: workDir,
 		});
 
-		expect(renderWith(built, statuses).lines).toHaveLength(2);
+		expect(renderWith(built, statuses).lines).toHaveLength(3);
 	});
 
 	it("survives a malformed settings file", () => {
@@ -299,7 +303,7 @@ describe("status line rendering", () => {
 			cwd: workDir,
 		});
 
-		expect(renderWith(built, statuses).lines).toHaveLength(3);
+		expect(renderWith(built, statuses).lines).toHaveLength(4);
 	});
 });
 
@@ -353,10 +357,10 @@ describe("structured feeds", () => {
 		const lines = renderWith(built, statuses).lines;
 
 		// 80% of 12 cells is cell 10, which is also where 160k of 200k falls.
-		expect(lines[0]).toContain("━━━━━━━━━━·─");
+		expect(lines[1]).toContain("━━━━━━━━━━·─");
 		expect(lines.join("\n")).not.toContain("152,340 tok");
 		// Nothing left for the status line.
-		expect(lines).toHaveLength(2);
+		expect(lines).toHaveLength(3);
 	});
 
 	it("colours the context icon with the bar's dumb-zone verdict", () => {
@@ -373,7 +377,7 @@ describe("structured feeds", () => {
 		const built = build(statuses);
 		built.bus.emit(QUOTAS_USAGE_UPDATED_EVENT, quotasFeed);
 
-		const line = renderWith(built, statuses).lines[1];
+		const line = renderWith(built, statuses).lines[2];
 
 		// The feed carries remaining percent; chips show used, so they fill up
 		// as the quota is consumed, like the context bar.
@@ -397,7 +401,7 @@ describe("structured feeds", () => {
 			windows: [{ ...quotasFeed.windows[0], resetText: " resets 2h" }],
 		});
 
-		expect(renderWith(built, statuses).lines[1]).toContain("66% resets 2h");
+		expect(renderWith(built, statuses).lines[2]).toContain("66% resets 2h");
 	});
 
 	it("shows a shared reset once, after the last window that shares it", () => {
@@ -413,7 +417,7 @@ describe("structured feeds", () => {
 			],
 		});
 
-		const line = renderWith(built, statuses).lines[1]!;
+		const line = renderWith(built, statuses).lines[2]!;
 		// A model-scoped window is part of the weekly allowance and resets with
 		// it, so it joins the weekly chip after a slash, without its own label.
 		expect(line).toContain(`wk ━━━━╾─── 50% / ──────── 0% ${RESET_ICON} 10h·17m`);
@@ -432,7 +436,7 @@ describe("structured feeds", () => {
 			],
 		});
 
-		const line = renderWith(built, statuses).lines[1]!;
+		const line = renderWith(built, statuses).lines[2]!;
 		expect(line).toContain("  fb ──────── 0%");
 		expect(line).not.toContain(" / ");
 	});
@@ -445,7 +449,7 @@ describe("structured feeds", () => {
 		const built = build(statuses);
 		built.bus.emit(QUOTAS_USAGE_UPDATED_EVENT, quotasFeed);
 
-		const line = renderWith(built, statuses).lines[1];
+		const line = renderWith(built, statuses).lines[2];
 		expect(line).toContain("5h");
 		expect(line).toContain("hello");
 	});
@@ -458,9 +462,9 @@ describe("structured feeds", () => {
 		const built = build(statuses);
 
 		const lines = renderWith(built, statuses).lines;
-		expect(lines[1]).toContain("152,340 tok");
-		expect(lines[1]).toContain("5h: 34%");
-		expect(lines[0]).not.toMatch(/[━─]·|·[━─]/u);
+		expect(lines[2]).toContain("152,340 tok");
+		expect(lines[2]).toContain("5h: 34%");
+		expect(lines[1]).not.toMatch(/[━─]·|·[━─]/u);
 	});
 
 	it("ignores a context feed describing a different window", () => {
@@ -472,9 +476,9 @@ describe("structured feeds", () => {
 		});
 
 		const lines = renderWith(built, statuses).lines;
-		expect(lines[0]).not.toMatch(/[━─]·|·[━─]/u);
+		expect(lines[1]).not.toMatch(/[━─]·|·[━─]/u);
 		// The readout is not lost while the bar cannot show it.
-		expect(lines[1]).toContain("152,340 tok");
+		expect(lines[2]).toContain("152,340 tok");
 	});
 
 	it("ignores a malformed feed rather than rendering its gaps", () => {
@@ -485,7 +489,7 @@ describe("structured feeds", () => {
 			windows: [{ shortLabel: "5h" }],
 		});
 
-		const line = renderWith(built, statuses).lines[1];
+		const line = renderWith(built, statuses).lines[2];
 		expect(line).toContain("5h: 34%");
 		expect(line).not.toContain("undefined");
 	});
@@ -506,7 +510,7 @@ describe("structured feeds", () => {
 			})),
 		});
 
-		const line = renderWith(built, statuses, 60).lines[1]!;
+		const line = renderWith(built, statuses, 60).lines[2]!;
 		expect(visibleWidth(line)).toBeLessThanOrEqual(60);
 	});
 
@@ -525,9 +529,9 @@ describe("structured feeds", () => {
 		built.bus.emit(QUOTAS_USAGE_UPDATED_EVENT, quotasFeed);
 
 		const lines = renderWith(built, statuses).lines;
-		expect(lines[0]).not.toMatch(/[━─]·|·[━─]/u);
-		expect(lines[1]).toContain("152,340 tok");
-		expect(lines[1]).toContain("5h: 34%");
+		expect(lines[1]).not.toMatch(/[━─]·|·[━─]/u);
+		expect(lines[2]).toContain("152,340 tok");
+		expect(lines[2]).toContain("5h: 34%");
 	});
 });
 
@@ -540,37 +544,10 @@ describe("core lines", () => {
 			cwd: workDir,
 		});
 
-		const line = renderWith(built, statuses).lines[0];
-		expect(line).toContain("claude-opus-5-5");
-		expect(line).toContain(workDir.split("/").pop());
-		expect(line).toContain("main");
-	});
-
-	it("keeps the segment gap between the halves when the line is too narrow", () => {
-		const statuses = new Map<string, string>();
-		const built = createContext({
-			session: { entries: [], sessionId: "s1", leafId: null },
-			statuses,
-			cwd: workDir,
-			percent: 7,
-			tokens: 14200,
-		});
-
-		const line = renderWith(built, statuses, 60).lines[0]!;
-		expect(line).toContain(`/200k  ${BRANCH_ICON} main`);
-	});
-
-	it("puts the branch before the folder, so the folder ends the line", () => {
-		const statuses = new Map<string, string>();
-		const built = createContext({
-			session: { entries: [], sessionId: "s1", leafId: null },
-			statuses,
-			cwd: workDir,
-		});
-
-		const line = renderWith(built, statuses).lines[0]!;
-		expect(line.indexOf(`${BRANCH_ICON} main`)).toBeLessThan(line.indexOf(DIR_ICON));
-		expect(line.trimEnd().endsWith(workDir.split("/").pop()!)).toBe(true);
+		const [location, turn] = renderWith(built, statuses).lines;
+		expect(location).toContain(workDir.split("/").pop());
+		expect(location).toContain("main");
+		expect(turn).toContain("claude-opus-5-5");
 	});
 
 	it("follows every icon with the same single space", () => {
@@ -585,7 +562,7 @@ describe("core lines", () => {
 			thinkingLevel: "high",
 		});
 
-		const line = renderWith(built, statuses).lines[0]!;
+		const line = renderWith(built, statuses).lines.slice(0, 2).join("\n");
 		for (const glyph of [MODEL_ICON, BRAIN, CONTEXT_ICON, DIR_ICON, BRANCH_ICON]) {
 			expect(line).toMatch(new RegExp(`${glyph} \\S`, "u"));
 		}
@@ -603,8 +580,8 @@ describe("core lines", () => {
 		const { lines, theme } = renderWith(built, statuses);
 		// Directly after the model, not out on the right where the bar lives.
 		// One cell per level, minimal through max; high is the fourth.
-		expect(lines[0]).toContain(`claude-opus-5-5  ${BRAIN} ━━━━──`);
-		expect(lines[0]).not.toContain("high");
+		expect(lines[1]).toContain(`claude-opus-5-5  ${BRAIN} ━━━━──`);
+		expect(lines[1]).not.toContain("high");
 		// The whole lit run in the current level's colour.
 		expect(theme.calls.find((call) => call.text === "━━━━")?.token).toBe("thinkingHigh");
 		expect(theme.calls.some((call) => call.token === "dim" && call.text === "──")).toBe(true);
@@ -621,7 +598,7 @@ describe("core lines", () => {
 		});
 
 		const { lines, theme } = renderWith(built, statuses);
-		expect(lines[0]).toContain(`${BRAIN} ━━━━━━ `);
+		expect(lines[1]).toContain(`${BRAIN} ━━━━━━ `);
 		expect(theme.calls.find((call) => call.text === "━━━━━━")?.token).toBe("thinkingMax");
 	});
 
@@ -634,7 +611,7 @@ describe("core lines", () => {
 			thinkingLevel: "ultra",
 		});
 
-		expect(renderWith(built, statuses).lines[0]).toContain(`${BRAIN} ultra`);
+		expect(renderWith(built, statuses).lines[1]).toContain(`${BRAIN} ultra`);
 	});
 
 	it("hides the thinking indicator when thinking is off", () => {
@@ -646,7 +623,7 @@ describe("core lines", () => {
 			thinkingLevel: "off",
 		});
 
-		expect(renderWith(built, statuses).lines[0]).not.toContain(BRAIN);
+		expect(renderWith(built, statuses).lines[1]).not.toContain(BRAIN);
 	});
 
 	it("shows used and total tokens beside the context percentage", () => {
@@ -660,7 +637,7 @@ describe("core lines", () => {
 		});
 
 		const { lines, theme } = renderWith(built, statuses);
-		expect(lines[0]).toContain("7%·14k/200k");
+		expect(lines[1]).toContain("7%·14k/200k");
 		// The used count reads with the percentage, in the bar's colour; the dot
 		// and the window size stay dim.
 		const tokenOf = (text: string) => theme.calls.find((call) => call.text === text)?.token;
@@ -679,7 +656,7 @@ describe("core lines", () => {
 			tokens: null,
 		});
 
-		const line = renderWith(built, statuses).lines[0]!;
+		const line = renderWith(built, statuses).lines[1]!;
 		expect(line).toContain("0%");
 		expect(line).not.toContain("/200k");
 	});
@@ -694,7 +671,7 @@ describe("core lines", () => {
 		});
 
 		const { lines, theme } = renderWith(built, statuses);
-		expect(lines[1]).toContain("95.0%/200k");
+		expect(lines[2]).toContain("95.0%/200k");
 		expect(theme.calls.some((call) => call.token === "error" && call.text.includes("95.0%"))).toBe(
 			true,
 		);
@@ -712,7 +689,7 @@ describe("core lines", () => {
 			cwd: workDir,
 		});
 
-		const line = renderWith(built, statuses).lines[1];
+		const line = renderWith(built, statuses).lines[2];
 		expect(line).toContain("↑150");
 		expect(line).toContain("R400");
 		expect(line).toContain("$0.500");

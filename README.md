@@ -4,15 +4,17 @@ A status line for [pi](https://pi.dev) in [pi-deck](https://github.com/hisea/pi-
 visual language — that also renders the status entries other extensions publish.
 
 ```
-  <model> claude-opus-5-5 <brain> ━━━───  <ctx> ━━━━──────·─ 36%·360k/1.0M  <branch> main  <dir> pi-statusline
+  <dir> pi-statusline  <branch> main
+  <model> claude-opus-5-5  <brain> ━━━───  <ctx> ━━━━──────·─ 36%·360k/1.0M
   5h ━━╾───── 34% <reset> 2h·19m  wk ━━━━━━╾─ 85% <reset> 3d  mo ━━━━╾─── 62% <reset> 12d
   ↑1.8M ↓416k R57M $0.687 36.0%/1.0M
 ```
 
-Line 1 is what the turn is — model, thinking level, context — and where it is
-happening, pushed to the far right. Line 2 is how much of each quota is used,
-as chips that fill up like the context bar. Line 3 is what it has cost. Line 2
-appears only when at least one extension has set a status.
+Line 1 is where the session is happening — folder, git branch, worktree. Line 2
+is what the turn is — model, thinking level, context. Line 3 is how much of each
+quota is used, as chips that fill up like the context bar, followed by any other
+extension statuses; it appears only when at least one extension has set a
+status. Line 4 is what it has cost.
 
 `<model>`, `<dir>`, `<branch>`, `<ctx>`, `<brain>` and `<reset>` are Nerd Font
 glyphs. `<reset>` replaces the `↺` pi-quotas publishes, which JetBrains Mono
@@ -26,10 +28,9 @@ footer is what draws the **extension status line** — the row that
 status readout in the session: quota/usage windows, the context dumb-zone
 indicator, and anything else an extension publishes.
 
-This package keeps pi-deck's layout and puts that row back, as the middle of
-three lines: the status line sits between the identity line and the usage line,
-so the footer reads top to bottom as what the turn is, what is left, then what
-it has cost.
+This package keeps pi-deck's look and puts that row back, above the token line,
+so the footer reads top to bottom as where the session is, what the turn is,
+what is left, then what it has cost.
 
 By default each status is rendered **verbatim**, including the colours the
 owning extension applied. That matters: a dumb-zone readout is only useful
@@ -112,7 +113,7 @@ optional.
 | Key               | Default    | Meaning                                                     |
 | ----------------- | ---------- | ----------------------------------------------------------- |
 | `statusLine`      | `true`     | Render the extension status line at all.                     |
-| `position`        | `"top"`    | `"top"` above the usage line, `"bottom"` below it.           |
+| `position`        | `"top"`    | `"top"` above the token line, `"bottom"` below it.           |
 | `separator`       | `"  "`     | Placed between status entries and quota chips.               |
 | `order`           | `[]`       | Keys to place first, in this sequence. Others follow, A→Z.   |
 | `hide`            | `[]`       | Keys to omit.                                                |
