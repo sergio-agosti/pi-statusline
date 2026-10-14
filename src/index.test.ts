@@ -516,13 +516,16 @@ describe("structured feeds", () => {
 		expect(lines.join("\n")).not.toContain(raw);
 	});
 
-	it("colours the cutoff tick as the action line, not the dumb zone", () => {
+	it("draws the cutoff tick in the footer's text grey, not a verdict colour", () => {
 		const statuses = new Map([["self-compact", "[###=====-!-|--------] 20% NOTICE"]]);
 		const built = build(statuses, 20);
 		built.bus.emit(SELF_COMPACT_UPDATED_EVENT, selfCompactFeed);
 
-		const { theme } = renderWith(built, statuses);
-		expect(theme.calls.some((call) => call.text === "·" && call.token === "error")).toBe(true);
+		const { lines, theme } = renderWith(built, statuses);
+		expect(lines[1]).toContain("━━━──────────·── 20%");
+		// The tick says where the threshold sits and the bar's colour is the reading, so a
+		// red dot read as a second verdict sitting next to the first.
+		expect(theme.calls.filter((call) => call.text === "·" && call.token === "error")).toEqual([]);
 	});
 
 	it("gives a shared cell to the cutoff, so the action threshold survives", () => {
@@ -534,13 +537,11 @@ describe("structured feeds", () => {
 		built.bus.emit(CONTEXT_TOKENS_UPDATED_EVENT, contextFeed);
 		built.bus.emit(SELF_COMPACT_UPDATED_EVENT, { ...selfCompactFeed, forcedTokens: 160000 });
 
-		const { lines, theme } = renderWith(built, statuses);
-		// Both thresholds land on cell 13, so the bar carries one dot and not two.
+		const { lines } = renderWith(built, statuses);
+		// Both thresholds land on cell 13, so the bar carries one dot and not two. Which
+		// of the two survived is the tick order's business, checked on the runs
+		// themselves in format.test.ts — the colour no longer tells them apart.
 		expect(lines[1]).toContain("━━━──────────·── 20%");
-		// And it is the cutoff's colour, so the dot that survived is the actionable
-		// one. (A dim · also exists after the bar, joining the token count, so
-		// absence of a dim dot is not the thing to assert.)
-		expect(theme.calls.some((call) => call.text === "·" && call.token === "error")).toBe(true);
 	});
 
 	it("shows the phase tag in the level's colour", () => {

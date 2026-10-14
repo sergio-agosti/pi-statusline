@@ -51,11 +51,13 @@ Two extensions publish their data on `pi.events` as well as a status string:
 | `quotas:usage:updated`   | `pi-quotas`      | quota chips on the status line        |
 | `self-compact:updated`   | `self-compact`   | the cutoff tick and the phase tag     |
 
-The context bar is 16 cells wide, and every threshold on it is the same `·` —
-colour is what tells them apart. The dumb zone takes `dim`; self-compact's hard
-cutoff takes `error`, because that is the line where it blocks every tool except
-its own. When two thresholds fall on one cell the later one wins, so the
-actionable mark survives a collision with the quality verdict.
+The context bar is 16 cells wide, and every threshold on it is the same `·` — the
+grey the rest of the footer's text is drawn in. The bar's own colour is the
+reading: how full the context is, and whether it has entered the dumb zone. A tick
+only says where a threshold sits, so both take that one neutral grey and neither
+reads as a verdict competing with the bar. When two thresholds fall on one cell the
+later one wins, so the actionable mark survives a collision with the quality
+verdict.
 
 Only the cutoff is drawn. The notice and warning lines are carried by
 self-compact's phase tag instead, which already turns when they are crossed and

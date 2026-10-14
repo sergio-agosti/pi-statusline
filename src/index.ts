@@ -128,13 +128,18 @@ const CONTEXT_SEVERITY_COLORS: Record<ContextTokenSeverity, ThemeColor> = {
 	dumb: "error",
 };
 
-/** The tick ids the context bar draws, and the colour each one takes. */
+/** The tick ids the context bar draws. The later one wins a cell the two share. */
 const TICK_DUMB_ZONE = "dumb-zone";
 const TICK_SELF_COMPACT = "self-compact";
-const TICK_COLORS: Record<string, ThemeColor> = {
-	[TICK_DUMB_ZONE]: "dim",
-	[TICK_SELF_COMPACT]: "error",
-};
+
+/**
+ * Every tick takes the grey the rest of the footer's text is drawn in.
+ *
+ * The bar's colour is the reading — how full the context is, and whether it has
+ * entered the dumb zone — so a tick only has to say where a threshold sits. A
+ * coloured tick read as a second verdict competing with that one.
+ */
+const TICK_COLOR: ThemeColor = "dim";
 
 /** The phase tag's colour, from self-compact's own level names. */
 function phaseColor(level: string): ThemeColor {
@@ -417,7 +422,7 @@ function renderContextBar(
 				: "syntaxString";
 
 	const bar = runs
-		.map((run) => theme.fg(run.kind === "tick" ? (TICK_COLORS[run.id] ?? "dim") : barToken, run.text))
+		.map((run) => theme.fg(run.kind === "tick" ? TICK_COLOR : barToken, run.text))
 		.join("");
 
 	return (
