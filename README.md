@@ -5,7 +5,7 @@ visual language — that also renders the status entries other extensions publis
 
 ```
   <dir> pi-statusline  <branch> main
-  <model> claude-opus-5-5  <brain> ━━━━━━──────  <ctx> ━━━·━·────────── 36%·360k/1.0M  WARNING
+  <model> claude-opus-5-5  <brain> ━━━━━━──────  <ctx> ━━━·━·────────── 36%·360k/1.0M  <phase>
   5h ━━╾───── 34% <reset> 2h·19m  wk ━━━━━━╾─ 85% <reset> 3d  mo ━━━━╾─── 62% <reset> 12d
   ↑1.8M ↓416k R57M $0.687 36.0%/1.0M
 ```
@@ -61,6 +61,13 @@ Only the cutoff is drawn. The notice and warning lines are carried by
 self-compact's phase tag instead, which already turns when they are crossed and
 colours itself from the extension's own level, so the bar gains one line worth
 seeing rather than three ramps.
+
+The phase tag is a glyph, not a word — the same glyphs self-compact opens its
+guidance messages with, so the tag and the message asking for a handoff read as one
+state. A lock is the hard cutoff, a spinner a compaction in flight, a check one that
+landed, a crossed circle one that failed, a triangle the warning line, an info
+circle the notice line, and a ban a threshold that does not resolve. A phase this
+footer does not know keeps its word, so a new one is readable before it is drawn.
 
 Drawing beats parsing. The status string is already rendered, so reading a
 number back out of it means guessing — and `pi-quotas` scores a window by

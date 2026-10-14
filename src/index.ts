@@ -144,6 +144,21 @@ function phaseColor(level: string): ThemeColor {
 	return level === "idle" ? "dim" : "muted";
 }
 
+/**
+ * self-compact's phase as a glyph. The same table is in the extension's guidance
+ * messages, so the tag on the bar and the message asking for the handoff read as
+ * one state rather than two.
+ */
+const PHASE_ICONS: Record<string, string> = {
+	NOTICE: "\uf05a", // fa-circle_info
+	WARNING: "\uf071", // fa-triangle_exclamation
+	FORCED: "\uf023", // fa-lock
+	COMPACTING: "\uf110", // fa-spinner
+	COMPACTED: "\uf00c", // fa-check
+	"COMPACTION FAILED": "\uf057", // fa-circle_xmark
+	REJECTED: "\uf05e", // fa-ban
+};
+
 /** Mirrors pi-quotas' own getSeverityColor. */
 const QUOTA_SEVERITY_COLORS: Record<QuotaSeverity, ThemeColor> = {
 	none: "success",
@@ -326,7 +341,8 @@ function renderTurnLine(
 }
 
 /**
- * self-compact's own phase tag, e.g. `FORCED` or `COMPACTING`.
+ * self-compact's own phase, as a glyph: the lock at `FORCED`, the spinner while a
+ * compaction runs.
  *
  * The thresholds are config and never move, so the bar can only mark where they
  * are; this is where the session actually is on that scale. `FORCED` is the one
@@ -335,7 +351,9 @@ function renderTurnLine(
 function renderPhase(theme: Theme, selfCompactFeed: SelfCompactFeed | undefined): string {
 	const phase = selfCompactFeed?.phase?.trim();
 	if (!selfCompactFeed || !phase) return "";
-	return theme.fg(phaseColor(selfCompactFeed.level), phase);
+	// A phase the table does not know keeps its word: an unknown state is worth more
+	// as text than as nothing.
+	return theme.fg(phaseColor(selfCompactFeed.level), PHASE_ICONS[phase] ?? phase);
 }
 
 /**

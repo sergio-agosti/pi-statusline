@@ -511,7 +511,8 @@ describe("structured feeds", () => {
 
 		const lines = renderWith(built, statuses).lines;
 		expect(lines[1]).toContain("━━━──────────·── 20%");
-		expect(lines[1]).not.toContain("FORCED");
+		// The lock is the forced phase's glyph, so an idle phase draws no glyph at all.
+		expect(lines[1]).not.toContain("\uf023");
 		expect(lines.join("\n")).not.toContain(raw);
 	});
 
@@ -548,8 +549,8 @@ describe("structured feeds", () => {
 		built.bus.emit(SELF_COMPACT_UPDATED_EVENT, { ...selfCompactFeed, level: "forced", phase: "FORCED" });
 
 		const { lines, theme } = renderWith(built, statuses);
-		expect(lines[1]).toContain("FORCED");
-		expect(theme.calls.find((call) => call.text === "FORCED")?.token).toBe("error");
+		expect(lines[1]).toContain("\uf023");
+		expect(theme.calls.find((call) => call.text === "\uf023")?.token).toBe("error");
 	});
 
 	it("drops the tick but keeps the phase when the thresholds do not resolve", () => {
@@ -564,7 +565,8 @@ describe("structured feeds", () => {
 		});
 
 		const lines = renderWith(built, statuses).lines;
-		expect(lines[1]).toContain("REJECTED");
+		// \uf05e is the ban, the glyph the rejected phase draws.
+		expect(lines[1]).toContain("\uf05e");
 		expect(lines[1]).not.toMatch(/[━─]·|·[━─]/u);
 		expect(lines.join("\n")).not.toContain(raw);
 	});
@@ -577,7 +579,8 @@ describe("structured feeds", () => {
 
 		const lines = renderWith(built, statuses).lines;
 		expect(lines[1]).not.toMatch(/[━─]·|·[━─]/u);
-		expect(lines[1]).not.toContain("WARNING");
+		// \uf071 is the warning triangle this feed would draw if the window matched.
+		expect(lines[1]).not.toContain("\uf071");
 		// The readout is not lost while the bar cannot show it.
 		expect(lines[2]).toContain(raw);
 	});
