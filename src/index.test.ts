@@ -211,6 +211,24 @@ describe("status line rendering", () => {
 		}
 	});
 
+	it("fits both bars in an 80-column footer without the ellipsis", () => {
+		const statuses = new Map<string, string>();
+		const built = createContext({
+			session: { entries: [], sessionId: "s1", leafId: null },
+			statuses,
+			cwd: workDir,
+			thinkingLevel: "medium",
+		});
+
+		// 12 thinking cells and 16 context cells plus the model name is the widest
+		// this line gets, so 80 columns is the width that has to hold it. `medium`
+		// is half-lit, which pins the boundary between the two runs as well.
+		const { lines } = renderWith(built, statuses, 80);
+		expect(lines[1]).toContain(`claude-opus-5-5  ${BRAIN} ━━━━━━──────`);
+		expect(lines[1]).toMatch(/[━─·]{16}/);
+		expect(lines[1]).not.toContain("...");
+	});
+
 	it("reads where, then what the turn is, the statuses, and what it cost", () => {
 		const statuses = new Map([["context-tokens", "160.0k ◆"]]);
 		const built = createContext({
@@ -712,12 +730,12 @@ describe("core lines", () => {
 
 		const { lines, theme } = renderWith(built, statuses);
 		// Directly after the model, not out on the right where the bar lives.
-		// One cell per level, minimal through max; high is the fourth.
-		expect(lines[1]).toContain(`claude-opus-5-5  ${BRAIN} ━━━━──`);
+		// Two cells per level, minimal through max; high is the fourth, so eight lit.
+		expect(lines[1]).toContain(`claude-opus-5-5  ${BRAIN} ━━━━━━━━────`);
 		expect(lines[1]).not.toContain("high");
 		// The whole lit run in the current level's colour.
-		expect(theme.calls.find((call) => call.text === "━━━━")?.token).toBe("thinkingHigh");
-		expect(theme.calls.some((call) => call.token === "dim" && call.text === "──")).toBe(true);
+		expect(theme.calls.find((call) => call.text === "━━━━━━━━")?.token).toBe("thinkingHigh");
+		expect(theme.calls.some((call) => call.token === "dim" && call.text === "────")).toBe(true);
 		expect(theme.calls.find((call) => call.text === `${BRAIN} `)?.token).toBe("thinkingHigh");
 	});
 
@@ -731,8 +749,8 @@ describe("core lines", () => {
 		});
 
 		const { lines, theme } = renderWith(built, statuses);
-		expect(lines[1]).toContain(`${BRAIN} ━━━━━━ `);
-		expect(theme.calls.find((call) => call.text === "━━━━━━")?.token).toBe("thinkingMax");
+		expect(lines[1]).toContain(`${BRAIN} ━━━━━━━━━━━━ `);
+		expect(theme.calls.find((call) => call.text === "━━━━━━━━━━━━")?.token).toBe("thinkingMax");
 	});
 
 	it("falls back to the level name for a level it does not know", () => {

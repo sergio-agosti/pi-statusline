@@ -100,6 +100,13 @@ const THINKING_COLORS: Record<string, ThemeColor> = {
 /** The thinking levels drawn as bar steps, lowest first. `off` draws nothing. */
 const THINKING_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
 
+/**
+ * Cells per thinking level. Six levels at one cell each read as a row of dots next
+ * to a 16-cell context bar; two each makes it a meter with the same grain as the
+ * rest of the footer.
+ */
+const THINKING_CELLS_PER_LEVEL = 2;
+
 
 const CONTEXT_BAR_WIDTH = 16;
 const QUOTA_BAR_WIDTH = 8;
@@ -333,7 +340,7 @@ function renderPhase(theme: Theme, selfCompactFeed: SelfCompactFeed | undefined)
 
 /**
  * The thinking level as a bar in the same style as the context and quota bars:
- * one cell per level, `━━━━──` at high.
+ * two cells per level, `━━━━━━──────` at medium.
  *
  * The lit run takes the current level's colour, like the brain beside it, and
  * the unlit track stays dim to show the headroom. A level the table does not
@@ -345,8 +352,9 @@ function renderThinking(theme: Theme, level: string): string {
 	const lit = THINKING_LEVELS.indexOf(level as (typeof THINKING_LEVELS)[number]);
 	if (lit < 0) return icon + theme.fg(color, level);
 
-	const unlit = "─".repeat(THINKING_LEVELS.length - lit - 1);
-	return icon + theme.fg(color, "━".repeat(lit + 1)) + (unlit ? theme.fg("dim", unlit) : "");
+	const filled = (lit + 1) * THINKING_CELLS_PER_LEVEL;
+	const unlit = "─".repeat(THINKING_LEVELS.length * THINKING_CELLS_PER_LEVEL - filled);
+	return icon + theme.fg(color, "━".repeat(filled)) + (unlit ? theme.fg("dim", unlit) : "");
 }
 
 /**
