@@ -21,7 +21,7 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
 
 const statuslineExtension = (await import("./index.ts")).default;
 
-import { CONTEXT_TOKENS_UPDATED_EVENT, QUOTAS_USAGE_UPDATED_EVENT } from "./feed.ts";
+import { CONTEXT_TOKENS_UPDATED_EVENT, QUOTAS_USAGE_UPDATED_EVENT, SELF_COMPACT_UPDATED_EVENT } from "./feed.ts";
 
 const RED = "\u001b[31m";
 const RESET = "\u001b[0m";
@@ -356,8 +356,10 @@ describe("structured feeds", () => {
 
 		const lines = renderWith(built, statuses).lines;
 
-		// 80% of 12 cells is cell 10, which is also where 160k of 200k falls.
-		expect(lines[1]).toContain("━━━━━━━━━━·─");
+		// 80% of 16 cells fills 13, and 160k of 200k is also cell 13, so the tick
+		// replaces the last filled cell. Pinned against the percentage that follows
+		// the bar: a bare `toContain` would also match a run of ━ inside a wider bar.
+		expect(lines[1]).toContain("━━━━━━━━━━━━━·── 80%");
 		expect(lines.join("\n")).not.toContain("152,340 tok");
 		// Nothing left for the status line.
 		expect(lines).toHaveLength(3);
@@ -452,6 +454,137 @@ describe("structured feeds", () => {
 		const line = renderWith(built, statuses).lines[2];
 		expect(line).toContain("5h");
 		expect(line).toContain("hello");
+	});
+
+	const selfCompactFeed = {
+		statusKey: "self-compact",
+		contextWindow: 200000,
+		tokens: 40000,
+		softTokens: 60000,
+		warnTokens: 120000,
+		forcedTokens: 160000,
+		level: "warning",
+		phase: "WARNING",
+		cycle: 1,
+	};
+
+	it("marks self-compact's hard cutoff on the bar and drops the raw status", () => {
+		const raw = "[###=====-!-|--------] 20% NOTICE";
+		const statuses = new Map([["self-compact", raw]]);
+		const built = build(statuses, 20);
+		built.bus.emit(SELF_COMPACT_UPDATED_EVENT, selfCompactFeed);
+
+		const lines = renderWith(built, statuses).lines;
+
+		// 160k of 200k is 80% of the window, which is cell 13 of 16, well clear of
+		// the 3 cells a 20% fill takes. Pinned against the percentage that follows,
+		// so the assertion cannot be satisfied by a stray run of ━.
+		expect(lines[1]).toContain("━━━──────────·── 20%");
+		expect(lines.join("\n")).not.toContain(raw);
+	});
+
+	it("marks the cutoff with no phase to show, which is the state below notice", () => {
+		const raw = "[###=====-!-|--------] 20%";
+		const statuses = new Map([["self-compact", raw]]);
+		const built = build(statuses, 20);
+		// idle is the normal state under the notice threshold: no tag, but the
+		// cutoff is still a line worth marking, and the raw bar is still a duplicate.
+		built.bus.emit(SELF_COMPACT_UPDATED_EVENT, { ...selfCompactFeed, level: "idle", phase: "" });
+
+		const lines = renderWith(built, statuses).lines;
+		expect(lines[1]).toContain("━━━──────────·── 20%");
+		expect(lines[1]).not.toContain("FORCED");
+		expect(lines.join("\n")).not.toContain(raw);
+	});
+
+	it("colours the cutoff tick as the action line, not the dumb zone", () => {
+		const statuses = new Map([["self-compact", "[###=====-!-|--------] 20% NOTICE"]]);
+		const built = build(statuses, 20);
+		built.bus.emit(SELF_COMPACT_UPDATED_EVENT, selfCompactFeed);
+
+		const { theme } = renderWith(built, statuses);
+		expect(theme.calls.some((call) => call.text === "·" && call.token === "error")).toBe(true);
+	});
+
+	it("gives a shared cell to the cutoff, so the action threshold survives", () => {
+		const statuses = new Map([
+			["context-tokens", "152,340 tok"],
+			["self-compact", "[####] 80% FORCED"],
+		]);
+		const built = build(statuses, 20);
+		built.bus.emit(CONTEXT_TOKENS_UPDATED_EVENT, contextFeed);
+		built.bus.emit(SELF_COMPACT_UPDATED_EVENT, { ...selfCompactFeed, forcedTokens: 160000 });
+
+		const { lines, theme } = renderWith(built, statuses);
+		// Both thresholds land on cell 13, so the bar carries one dot and not two.
+		expect(lines[1]).toContain("━━━──────────·── 20%");
+		// And it is the cutoff's colour, so the dot that survived is the actionable
+		// one. (A dim · also exists after the bar, joining the token count, so
+		// absence of a dim dot is not the thing to assert.)
+		expect(theme.calls.some((call) => call.text === "·" && call.token === "error")).toBe(true);
+	});
+
+	it("shows the phase tag in the level's colour", () => {
+		const statuses = new Map([["self-compact", "[####] 80% FORCED"]]);
+		const built = build(statuses, 80);
+		built.bus.emit(SELF_COMPACT_UPDATED_EVENT, { ...selfCompactFeed, level: "forced", phase: "FORCED" });
+
+		const { lines, theme } = renderWith(built, statuses);
+		expect(lines[1]).toContain("FORCED");
+		expect(theme.calls.find((call) => call.text === "FORCED")?.token).toBe("error");
+	});
+
+	it("drops the tick but keeps the phase when the thresholds do not resolve", () => {
+		const raw = "self-compact REJECTED";
+		const statuses = new Map([["self-compact", raw]]);
+		const built = build(statuses, 20);
+		built.bus.emit(SELF_COMPACT_UPDATED_EVENT, {
+			...selfCompactFeed,
+			forcedTokens: null,
+			level: "unknown",
+			phase: "REJECTED",
+		});
+
+		const lines = renderWith(built, statuses).lines;
+		expect(lines[1]).toContain("REJECTED");
+		expect(lines[1]).not.toMatch(/[━─]·|·[━─]/u);
+		expect(lines.join("\n")).not.toContain(raw);
+	});
+
+	it("ignores a self-compact feed describing a different window", () => {
+		const raw = "[####] 20% NOTICE";
+		const statuses = new Map([["self-compact", raw]]);
+		const built = build(statuses, 20);
+		built.bus.emit(SELF_COMPACT_UPDATED_EVENT, { ...selfCompactFeed, contextWindow: 1000000 });
+
+		const lines = renderWith(built, statuses).lines;
+		expect(lines[1]).not.toMatch(/[━─]·|·[━─]/u);
+		expect(lines[1]).not.toContain("WARNING");
+		// The readout is not lost while the bar cannot show it.
+		expect(lines[2]).toContain(raw);
+	});
+
+	it("ignores a malformed self-compact feed rather than rendering its gaps", () => {
+		const raw = "[####] 20% NOTICE";
+		const statuses = new Map([["self-compact", raw]]);
+		const built = build(statuses, 20);
+		built.bus.emit(SELF_COMPACT_UPDATED_EVENT, { statusKey: "self-compact", phase: "FORCED" });
+
+		const lines = renderWith(built, statuses).lines;
+		expect(lines[2]).toContain(raw);
+		expect(lines.join("\n")).not.toContain("undefined");
+	});
+
+	it("keeps the raw status when the feed resolves to nothing at all", () => {
+		const raw = "self-compact REJECTED";
+		const statuses = new Map([["self-compact", raw]]);
+		const built = build(statuses, 20);
+		// Neither a cutoff to draw nor a phase to show: this footer contributes
+		// nothing for the extension, so the extension's own text is the only readout.
+		built.bus.emit(SELF_COMPACT_UPDATED_EVENT, { ...selfCompactFeed, forcedTokens: null, phase: "" });
+
+		const lines = renderWith(built, statuses).lines;
+		expect(lines[2]).toContain(raw);
 	});
 
 	it("leaves statuses verbatim when no feed has arrived", () => {

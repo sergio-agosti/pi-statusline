@@ -37,21 +37,25 @@ import {
 	chipLabel,
 	isModelLabel,
 	collectUsageTotals,
-	contextBarSegments,
+	contextBarRuns,
 	formatTokens,
 	sanitizeInlineText,
+	type ContextBarTick,
 	type UsageTotals,
 } from "./format.ts";
 import {
 	CONTEXT_TOKENS_UPDATED_EVENT,
 	QUOTAS_USAGE_UPDATED_EVENT,
+	SELF_COMPACT_UPDATED_EVENT,
 	parseContextFeed,
 	parseQuotasFeed,
+	parseSelfCompactFeed,
 	type ContextFeed,
 	type ContextTokenSeverity,
 	type QuotaFeedWindow,
 	type QuotaSeverity,
 	type QuotasFeed,
+	type SelfCompactFeed,
 } from "./feed.ts";
 import { orderStatusEntries, readSettings, type StatuslineSettings } from "./settings.ts";
 import { getWorktreeLabel, invalidateWorktreeCache } from "./worktree.ts";
@@ -97,7 +101,7 @@ const THINKING_COLORS: Record<string, ThemeColor> = {
 const THINKING_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
 
 
-const CONTEXT_BAR_WIDTH = 12;
+const CONTEXT_BAR_WIDTH = 16;
 const QUOTA_BAR_WIDTH = 8;
 
 /**
@@ -116,6 +120,22 @@ const CONTEXT_SEVERITY_COLORS: Record<ContextTokenSeverity, ThemeColor> = {
 	warning: "warning",
 	dumb: "error",
 };
+
+/** The tick ids the context bar draws, and the colour each one takes. */
+const TICK_DUMB_ZONE = "dumb-zone";
+const TICK_SELF_COMPACT = "self-compact";
+const TICK_COLORS: Record<string, ThemeColor> = {
+	[TICK_DUMB_ZONE]: "dim",
+	[TICK_SELF_COMPACT]: "error",
+};
+
+/** The phase tag's colour, from self-compact's own level names. */
+function phaseColor(level: string): ThemeColor {
+	if (level === "forced") return "error";
+	if (level === "warning") return "warning";
+	if (level === "notice") return "accent";
+	return level === "idle" ? "dim" : "muted";
+}
 
 /** Mirrors pi-quotas' own getSeverityColor. */
 const QUOTA_SEVERITY_COLORS: Record<QuotaSeverity, ThemeColor> = {
@@ -143,6 +163,7 @@ interface StatsCache {
 interface Feeds {
 	context?: ContextFeed;
 	quotas?: QuotasFeed;
+	selfCompact?: SelfCompactFeed;
 }
 
 export default function piStatusline(pi: ExtensionAPI) {
@@ -157,6 +178,13 @@ export default function piStatusline(pi: ExtensionAPI) {
 		const feed = parseContextFeed(data);
 		if (!feed) return;
 		feeds.context = feed;
+		requestRender?.();
+	});
+
+	pi.events.on(SELF_COMPACT_UPDATED_EVENT, (data) => {
+		const feed = parseSelfCompactFeed(data);
+		if (!feed) return;
+		feeds.selfCompact = feed;
 		requestRender?.();
 	});
 
@@ -224,15 +252,16 @@ export default function piStatusline(pi: ExtensionAPI) {
 
 			function renderFrame(width: number): string[] {
 				const contextFeed = applicableContextFeed(ctx, feeds.context, settings);
+				const selfCompactFeed = applicableSelfCompactFeed(ctx, feeds.selfCompact, settings);
 
 				const lines = [
 					renderLocationLine(theme, footerData, ctx, width),
-					renderTurnLine(theme, ctx, width, contextFeed),
+					renderTurnLine(theme, ctx, width, contextFeed, selfCompactFeed),
 				];
 
 				const statusLine =
 					settings.statusLine && width > 0
-						? renderStatusLine(theme, footerData, settings, feeds, contextFeed, width)
+						? renderStatusLine(theme, footerData, settings, feeds, contextFeed, selfCompactFeed, width)
 						: undefined;
 
 				if (statusLine && settings.position === "top") lines.push(statusLine);
@@ -273,6 +302,7 @@ function renderTurnLine(
 	ctx: ExtensionContext,
 	width: number,
 	contextFeed: ContextFeed | undefined,
+	selfCompactFeed: SelfCompactFeed | undefined,
 ): string {
 	const thinkingLevel = ctx.thinkingLevel;
 	const thinking =
@@ -281,10 +311,24 @@ function renderTurnLine(
 	const segments = [
 		theme.fg("syntaxType", ICONS.model + ICON_GAP + (ctx.model?.id ?? "no-model")),
 		thinking,
-		renderContextBar(theme, ctx, contextFeed),
+		renderContextBar(theme, ctx, contextFeed, selfCompactFeed),
+		renderPhase(theme, selfCompactFeed),
 	].filter(Boolean);
 
 	return truncateToWidth(segments.join(theme.fg("dim", SEGMENT_GAP)), width);
+}
+
+/**
+ * self-compact's own phase tag, e.g. `FORCED` or `COMPACTING`.
+ *
+ * The thresholds are config and never move, so the bar can only mark where they
+ * are; this is where the session actually is on that scale. `FORCED` is the one
+ * worth the width — every tool but `self_compact` is blocked until it clears.
+ */
+function renderPhase(theme: Theme, selfCompactFeed: SelfCompactFeed | undefined): string {
+	const phase = selfCompactFeed?.phase?.trim();
+	if (!selfCompactFeed || !phase) return "";
+	return theme.fg(phaseColor(selfCompactFeed.level), phase);
 }
 
 /**
@@ -306,30 +350,37 @@ function renderThinking(theme: Theme, level: string): string {
 }
 
 /**
- * Context progress bar, with the dumb-zone threshold ticked onto it.
+ * Context progress bar, with each known threshold ticked onto it.
  *
- * The fill is the used fraction and the tick marks where the dumb zone starts,
- * both measured against the same window, so the two are directly comparable.
- * Colour, icon included, comes from pi-token-count's verdict when it is
- * available, and from absolute fullness otherwise.
+ * The fill is the used fraction and every tick is a threshold, all measured
+ * against the same window, so the three are directly comparable: how full the
+ * context is, where this model starts to get dumb (pi-token-count), and where
+ * self-compact takes the tools away. Colour, icon included, comes from
+ * pi-token-count's verdict when it is available, and from absolute fullness
+ * otherwise.
  */
 function renderContextBar(
 	theme: Theme,
 	ctx: ExtensionContext,
 	contextFeed: ContextFeed | undefined,
+	selfCompactFeed: SelfCompactFeed | undefined,
 ): string {
 	const contextWindow = contextWindowOf(ctx);
 	if (contextWindow <= 0) return "";
 
 	const usage = ctx.getContextUsage();
 	const percent = usage?.percent ?? 0;
-	const segments = contextBarSegments(
-		Math.min(1, percent / 100),
-		CONTEXT_BAR_WIDTH,
-		contextFeed
-			? { start: contextFeed.dumbZoneStart, window: contextWindow }
-			: undefined,
-	);
+	// Weakest first: the later tick wins a cell the two share, and the action
+	// threshold is the one worth seeing if only one fits.
+	const ticks: ContextBarTick[] = [];
+	if (contextFeed) {
+		ticks.push({ at: contextFeed.dumbZoneStart, window: contextWindow, id: TICK_DUMB_ZONE });
+	}
+	if (selfCompactFeed?.forcedTokens) {
+		ticks.push({ at: selfCompactFeed.forcedTokens, window: contextWindow, id: TICK_SELF_COMPACT });
+	}
+
+	const runs = contextBarRuns(Math.min(1, percent / 100), CONTEXT_BAR_WIDTH, ticks);
 
 	const barToken: ThemeColor = contextFeed
 		? CONTEXT_SEVERITY_COLORS[contextFeed.severity]
@@ -339,10 +390,9 @@ function renderContextBar(
 				? "warning"
 				: "syntaxString";
 
-	const bar =
-		theme.fg(barToken, segments.before) +
-		(segments.tick ? theme.fg("dim", segments.tick) : "") +
-		theme.fg(barToken, segments.after);
+	const bar = runs
+		.map((run) => theme.fg(run.kind === "tick" ? (TICK_COLORS[run.id] ?? "dim") : barToken, run.text))
+		.join("");
 
 	return (
 		theme.fg(barToken, ICONS.context + ICON_GAP) +
@@ -398,10 +448,14 @@ function renderStatusLine(
 	settings: StatuslineSettings,
 	feeds: Feeds,
 	contextFeed: ContextFeed | undefined,
+	selfCompactFeed: SelfCompactFeed | undefined,
 	width: number,
 ): string | undefined {
 	const superseded = new Set<string>();
 	if (contextFeed) superseded.add(contextFeed.statusKey);
+	// The phase tag and the tick carry the same reading as the raw bar-plus-tag
+	// string, so it is dropped once this footer draws either of them.
+	if (selfCompactDraws(selfCompactFeed)) superseded.add(selfCompactFeed!.statusKey);
 
 	const chips = renderQuotaChips(theme, settings, feeds.quotas, superseded);
 	const entries = orderStatusEntries(footerData.getExtensionStatuses(), settings.order);
@@ -528,6 +582,37 @@ function applicableContextFeed(
 	const contextWindow = contextWindowOf(ctx);
 	if (!(contextWindow > 0) || feed.contextWindow !== contextWindow) return undefined;
 	return feed;
+}
+
+/**
+ * The self-compact feed, but only while it describes the window being drawn.
+ *
+ * self-compact resolves its thresholds per model, so a payload left over from a
+ * previous model would put the tick, and the phase tag, at the wrong scale.
+ * Treating it as absent also keeps the raw status visible, so the readout is
+ * never lost while the bar cannot show it.
+ *
+ * A missing phase is not a reason to reject the payload: below every threshold
+ * the extension has no phase to report, and the cutoff is still worth marking.
+ */
+function applicableSelfCompactFeed(
+	ctx: ExtensionContext,
+	feed: SelfCompactFeed | undefined,
+	settings: StatuslineSettings,
+): SelfCompactFeed | undefined {
+	if (!settings.structuredFeeds || !feed) return undefined;
+	const contextWindow = contextWindowOf(ctx);
+	if (!(contextWindow > 0) || feed.contextWindow !== contextWindow) return undefined;
+	return feed;
+}
+
+/**
+ * Whether the feed puts anything on screen: the cutoff tick, the phase tag, or
+ * both. Only then is the extension's own status string a duplicate of what this
+ * footer already draws.
+ */
+function selfCompactDraws(feed: SelfCompactFeed | undefined): boolean {
+	return Boolean(feed && (feed.phase || feed.forcedTokens));
 }
 
 /** Model context window, or 0 when unknown. */

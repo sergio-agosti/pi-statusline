@@ -83,18 +83,34 @@ export function collectUsageTotals(entries: readonly SessionEntry[]): UsageTotal
 }
 
 /**
- * The glyph marking where the dumb zone starts, from pi-token-count. A dot
- * rather than a cross, so it marks the threshold without crowding the bar.
+ * The glyph marking a threshold on the context bar. Every threshold uses the
+ * same dot — colour is what tells them apart — so the bar keeps one mark and
+ * one meaning: this is where something happens.
  */
-const DUMB_ZONE_TICK = "·";
+const TICK = "·";
 
-/** A context bar split around the dumb-zone tick so each part can be coloured. */
-export interface ContextBarSegments {
-	before: string;
-	/** The tick glyph, or "" when the dumb zone is unknown. */
-	tick: string;
-	after: string;
+/** A threshold to mark on the bar, positioned in tokens against `window`. */
+export interface ContextBarTick {
+	/** The threshold's position, in tokens. */
+	at: number;
+	/** The window `at` is measured against. */
+	window: number;
+	/**
+	 * Which threshold this is, so the caller can colour it. Weakest first: a
+	 * tick later in the list wins a cell two thresholds share, mirroring
+	 * self-compact's own `|` > `!` > `~` rule.
+	 */
+	id: string;
 }
+
+/**
+ * A run of the bar: either the cells, or one threshold's tick glyph.
+ *
+ * Runs come back in bar order so the caller can colour each and join them.
+ */
+export type ContextBarRun =
+	| { kind: "fill"; text: string }
+	| { kind: "tick"; id: string; text: string };
 
 function barCells(fillRatio: number, width: number): string[] {
 	const filled = Math.round(Math.max(0, Math.min(1, fillRatio)) * width);
@@ -102,39 +118,49 @@ function barCells(fillRatio: number, width: number): string[] {
 }
 
 /**
- * Where the dumb-zone tick sits, as a bar cell index. Clamped to the bar, since
- * a threshold past the window would otherwise fall off the end.
+ * Where a threshold sits, as a bar cell index. Clamped to the bar, since a
+ * threshold past the window would otherwise fall off the end.
  */
-function tickIndexFor(dumbZoneStart: number, contextWindow: number, width: number): number {
-	const ratio = dumbZoneStart / contextWindow;
-	return Math.max(0, Math.min(width - 1, Math.round(ratio * width)));
+function tickIndexFor(at: number, window: number, width: number): number {
+	return Math.max(0, Math.min(width - 1, Math.round((at / window) * width)));
 }
 
 /**
- * Bar cells filled to `fillRatio`, with an optional tick marking where the dumb
- * zone starts.
+ * Bar cells filled to `fillRatio`, with a tick replacing the cell at each
+ * threshold.
  *
- * The tick replaces the cell at its index rather than being inserted, so the bar
- * keeps its width and everything after it stays aligned. `dumbZone` is omitted
- * when the threshold is unknown, which leaves a plain bar.
+ * A tick replaces the cell at its index rather than being inserted, so the bar
+ * keeps its width and everything left of it stays aligned. A threshold that is
+ * unknown, unset or past the end of the window is skipped, which leaves a plain
+ * bar rather than a mark in the wrong place.
  */
-export function contextBarSegments(
+export function contextBarRuns(
 	fillRatio: number,
 	width: number,
-	dumbZone?: { start: number; window: number },
-): ContextBarSegments {
+	ticks: readonly ContextBarTick[] = [],
+): ContextBarRun[] {
 	const cells = barCells(fillRatio, width);
-	const index =
-		dumbZone && dumbZone.window > 0 && dumbZone.start > 0
-			? tickIndexFor(dumbZone.start, dumbZone.window, width)
-			: undefined;
+	const marks: (string | undefined)[] = new Array<string | undefined>(width).fill(undefined);
+	for (const tick of ticks) {
+		if (!(tick.window > 0) || !(tick.at > 0)) continue;
+		if (!Number.isFinite(tick.at) || !Number.isFinite(tick.window)) continue;
+		marks[tickIndexFor(tick.at, tick.window, width)] = tick.id;
+	}
 
-	if (index === undefined) return { before: cells.join(""), tick: "", after: "" };
-	return {
-		before: cells.slice(0, index).join(""),
-		tick: DUMB_ZONE_TICK,
-		after: cells.slice(index + 1).join(""),
-	};
+	const runs: ContextBarRun[] = [];
+	let fill = "";
+	for (let index = 0; index < width; index += 1) {
+		const mark = marks[index];
+		if (mark === undefined) {
+			fill += cells[index];
+			continue;
+		}
+		if (fill) runs.push({ kind: "fill", text: fill });
+		fill = "";
+		runs.push({ kind: "tick", id: mark, text: TICK });
+	}
+	if (fill) runs.push({ kind: "fill", text: fill });
+	return runs;
 }
 
 /**

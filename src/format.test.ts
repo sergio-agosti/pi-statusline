@@ -6,7 +6,7 @@ import {
 	chipBar,
 	chipLabel,
 	collectUsageTotals,
-	contextBarSegments,
+	contextBarRuns,
 	formatTokens,
 	sanitizeInlineText,
 	sanitizeStatusText,
@@ -194,37 +194,69 @@ describe("buildStatusLine prefix", () => {
 	});
 });
 
-describe("contextBarSegments", () => {
+describe("contextBarRuns", () => {
 	it("fills the bar and leaves the remainder empty", () => {
-		// Without a tick the whole bar lands in `before`, so it can be coloured as
-		// one unit.
-		expect(contextBarSegments(0.5, 4)).toEqual({ before: "━━──", tick: "", after: "" });
+		// Without a tick the whole bar is one run, so it can be coloured as one unit.
+		expect(contextBarRuns(0.5, 4)).toEqual([{ kind: "fill", text: "━━──" }]);
 	});
 
-	it("replaces the cell at the dumb-zone threshold rather than inserting one", () => {
+	it("replaces the cell at the threshold rather than inserting one", () => {
 		// 80% of 12 cells is cell 10, which is also where 160k of 200k falls.
-		expect(contextBarSegments(0.8, 12, { start: 160000, window: 200000 })).toEqual({
-			before: "━━━━━━━━━━",
-			tick: "·",
-			after: "─",
-		});
+		expect(contextBarRuns(0.8, 12, [{ at: 160000, window: 200000, id: "dumb-zone" }])).toEqual([
+			{ kind: "fill", text: "━━━━━━━━━━" },
+			{ kind: "tick", id: "dumb-zone", text: "·" },
+			{ kind: "fill", text: "─" },
+		]);
 	});
 
-	it("keeps the bar's width when it has a tick", () => {
-		const segments = contextBarSegments(0.2, 12, { start: 1000, window: 2000 });
-		expect(visibleWidth(segments.before + segments.tick + segments.after)).toBe(12);
+	it("keeps the bar's width when it has ticks", () => {
+		const runs = contextBarRuns(0.2, 12, [
+			{ at: 1000, window: 2000, id: "dumb-zone" },
+			{ at: 1600, window: 2000, id: "self-compact" },
+		]);
+		const width = runs.reduce((total, run) => total + visibleWidth(run.text), 0);
+		expect(width).toBe(12);
 	});
 
-	it("omits the tick when the threshold is unknown", () => {
-		expect(contextBarSegments(0.5, 4, { start: 0, window: 200000 }).tick).toBe("");
-		expect(contextBarSegments(0.5, 4, { start: 160000, window: 0 }).tick).toBe("");
+	it("skips a threshold that is unknown, unset or past the end of the window", () => {
+		const marks = (at: number, window: number) =>
+			contextBarRuns(0.5, 4, [{ at, window, id: "tick" }]).filter((run) => run.kind === "tick");
+		expect(marks(0, 200000)).toHaveLength(0);
+		expect(marks(160000, 0)).toHaveLength(0);
+		expect(contextBarRuns(0.5, 4)).toEqual([{ kind: "fill", text: "━━──" }]);
 	});
 
 	it("clamps a threshold past the end of the window onto the bar", () => {
-		const segments = contextBarSegments(0, 4, { start: 400000, window: 200000 });
-		expect(segments.before).toBe("───");
-		expect(segments.tick).toBe("·");
-		expect(segments.after).toBe("");
+		expect(contextBarRuns(0, 4, [{ at: 400000, window: 200000, id: "tick" }])).toEqual([
+			{ kind: "fill", text: "───" },
+			{ kind: "tick", id: "tick", text: "·" },
+		]);
+	});
+
+	it("gives a shared cell to the tick listed last", () => {
+		// 80% and 81% of the window both land on cell 9 of 12; the caller lists the
+		// threshold worth seeing second.
+		const runs = contextBarRuns(0.5, 12, [
+			{ at: 160000, window: 200000, id: "dumb-zone" },
+			{ at: 162000, window: 200000, id: "self-compact" },
+		]);
+		const ticks = runs.filter((run) => run.kind === "tick");
+		expect(ticks).toEqual([{ kind: "tick", id: "self-compact", text: "·" }]);
+	});
+
+	it("places two ticks apart when their thresholds are apart", () => {
+		// 16% and 30% of 1M on an 16-cell bar: cells 3 and 5.
+		const runs = contextBarRuns(0.5, 16, [
+			{ at: 160000, window: 1000000, id: "dumb-zone" },
+			{ at: 300000, window: 1000000, id: "self-compact" },
+		]);
+		expect(runs.map((run) => (run.kind === "tick" ? run.id : run.text))).toEqual([
+			"━━━",
+			"dumb-zone",
+			"━",
+			"self-compact",
+			"━━────────",
+		]);
 	});
 });
 

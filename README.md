@@ -5,7 +5,7 @@ visual language — that also renders the status entries other extensions publis
 
 ```
   <dir> pi-statusline  <branch> main
-  <model> claude-opus-5-5  <brain> ━━━───  <ctx> ━━━━──────·─ 36%·360k/1.0M
+  <model> claude-opus-5-5  <brain> ━━━───  <ctx> ━━━·━·────────── 36%·360k/1.0M  WARNING
   5h ━━╾───── 34% <reset> 2h·19m  wk ━━━━━━╾─ 85% <reset> 3d  mo ━━━━╾─── 62% <reset> 12d
   ↑1.8M ↓416k R57M $0.687 36.0%/1.0M
 ```
@@ -45,10 +45,22 @@ Extensions that publish a **structured feed** on `pi.events` get their data
 
 Two extensions publish their data on `pi.events` as well as a status string:
 
-| Channel                  | Published by     | Drawn as                       |
-| ------------------------ | ---------------- | ------------------------------ |
-| `context-tokens:updated` | `pi-token-count` | the dumb-zone tick on the bar  |
-| `quotas:usage:updated`   | `pi-quotas`      | quota chips on the status line |
+| Channel                  | Published by     | Drawn as                              |
+| ------------------------ | ---------------- | ------------------------------------- |
+| `context-tokens:updated` | `pi-token-count` | the dumb-zone tick on the bar         |
+| `quotas:usage:updated`   | `pi-quotas`      | quota chips on the status line        |
+| `self-compact:updated`   | `self-compact`   | the cutoff tick and the phase tag     |
+
+The context bar is 16 cells wide, and every threshold on it is the same `·` —
+colour is what tells them apart. The dumb zone takes `dim`; self-compact's hard
+cutoff takes `error`, because that is the line where it blocks every tool except
+its own. When two thresholds fall on one cell the later one wins, so the
+actionable mark survives a collision with the quality verdict.
+
+Only the cutoff is drawn. The notice and warning lines are carried by
+self-compact's phase tag instead, which already turns when they are crossed and
+colours itself from the extension's own level, so the bar gains one line worth
+seeing rather than three ramps.
 
 Drawing beats parsing. The status string is already rendered, so reading a
 number back out of it means guessing — and `pi-quotas` scores a window by

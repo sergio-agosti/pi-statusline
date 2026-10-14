@@ -14,6 +14,7 @@
 
 export const CONTEXT_TOKENS_UPDATED_EVENT = "context-tokens:updated";
 export const QUOTAS_USAGE_UPDATED_EVENT = "quotas:usage:updated";
+export const SELF_COMPACT_UPDATED_EVENT = "self-compact:updated";
 
 export type ContextTokenSeverity = "normal" | "warning" | "dumb";
 
@@ -54,6 +55,45 @@ export interface QuotasFeed {
 	/** The status key this feed supersedes. */
 	statusKey: string;
 	windows: QuotaFeedWindow[];
+}
+
+/**
+ * The self-compact thresholds that apply to the active model, as token counts.
+ *
+ * Only the hard cutoff is drawn: it is the line where self-compact blocks every
+ * tool except its own, which is the one that changes what the session can do.
+ * The notice and warning lines are carried by the extension's phase tag instead,
+ * which already turns when they are crossed.
+ */
+export interface SelfCompactFeed {
+	/** The status key this feed supersedes. */
+	statusKey: string;
+	/** The window the threshold is measured against, for the staleness check. */
+	contextWindow: number;
+	/** Where self-compact blocks every other tool, or null when unresolved. */
+	forcedTokens: number | null;
+	level: string;
+	/** The extension's own phase tag, e.g. NOTICE, FORCED, COMPACTING. */
+	phase: string | null;
+}
+
+export function parseSelfCompactFeed(data: unknown): SelfCompactFeed | undefined {
+	if (!isRecord(data)) return undefined;
+
+	const { statusKey, contextWindow, forcedTokens, level, phase } = data;
+	if (typeof statusKey !== "string") return undefined;
+	if (!isFiniteNumber(contextWindow) || contextWindow <= 0) return undefined;
+	if (forcedTokens !== null && !isFiniteNumber(forcedTokens)) return undefined;
+	if (typeof level !== "string") return undefined;
+	if (phase !== null && typeof phase !== "string") return undefined;
+
+	return {
+		statusKey,
+		contextWindow,
+		forcedTokens,
+		level,
+		phase,
+	};
 }
 
 const CONTEXT_SEVERITIES: readonly ContextTokenSeverity[] = [
