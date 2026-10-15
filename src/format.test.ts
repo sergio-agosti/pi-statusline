@@ -273,9 +273,18 @@ describe("chipBar", () => {
 		expect(chipBar(0.99, 8)).toBe("━━━━━━━╾");
 	});
 
+	it("shows a start for a fill too small to occupy a whole cell", () => {
+		// 1%, 4% and 6% of 8 cells all floor to none, which would otherwise
+		// leave a chip that looks untouched beside its own non-zero number.
+		expect(chipBar(0.01, 8)).toBe("╾───────");
+		expect(chipBar(0.04, 8)).toBe("╾───────");
+		expect(chipBar(0.06, 8)).toBe("╾───────");
+	});
+
 	it("handles the empty and full ends", () => {
 		expect(chipBar(0, 4)).toBe("────");
 		expect(chipBar(1, 4)).toBe("━━━━");
+		expect(chipBar(0, 0)).toBe("");
 	});
 });
 

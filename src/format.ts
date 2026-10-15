@@ -192,14 +192,20 @@ export function chipLabel(label: string): string {
  * track.
  *
  * The fill rounds down, never up, so the bar is full only once the allowance
- * is used up.
+ * is used up. Any fill at all draws the cap, though: 1% of an 8-cell bar floors
+ * to no cells, and a quota barely touched must still read as started rather
+ * than as untouched.
  */
 export function chipBar(fillRatio: number, width: number): string {
-	const filled = Math.floor(Math.max(0, Math.min(1, fillRatio)) * width);
+	if (width <= 0) return "";
+	const ratio = Math.max(0, Math.min(1, fillRatio));
+	if (ratio <= 0) return "─".repeat(width);
+
+	const filled = Math.floor(ratio * width);
 	if (filled >= width) return "━".repeat(width);
-	if (filled <= 0) return "─".repeat(width);
-	// ╾ rather than ╸: its light right half joins the empty track, where ╸
-	// leaves a blank half-cell that reads as a gap.
+	// The cap sits at the fill boundary, so the cell the fill ends inside reads
+	// as part-full rather than empty. ╾ rather than ╸: its light right half joins
+	// the empty track, where ╸ leaves a blank half-cell that reads as a gap.
 	return "━".repeat(filled) + "╾" + "─".repeat(width - filled - 1);
 }
 

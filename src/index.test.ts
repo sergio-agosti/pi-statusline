@@ -413,6 +413,27 @@ describe("structured feeds", () => {
 		expect(line).not.toContain("34%");
 	});
 
+	it("draws a start on a chip whose quota is barely touched", () => {
+		// opencode-go's 5h/wk/mo windows sit at 1%, 4% and 6% used on a quiet
+		// account. Each floors to no whole cells, but the chip must still show
+		// the fill began rather than looking identical to an untouched one.
+		const statuses = new Map([["pi-quotas-usage", "5h: 99% · wk: 96% · mo: 94%"]]);
+		const built = build(statuses);
+		built.bus.emit(QUOTAS_USAGE_UPDATED_EVENT, {
+			statusKey: "pi-quotas-usage",
+			windows: [
+				{ ...quotasFeed.windows[0], shortLabel: "5h", barPercent: 99 },
+				{ ...quotasFeed.windows[1], shortLabel: "wk", barPercent: 96 },
+				{ ...quotasFeed.windows[1], shortLabel: "mo", barPercent: 94 },
+			],
+		});
+
+		const line = renderWith(built, statuses).lines[2];
+		expect(line).toContain("5h ╾─────── 1%");
+		expect(line).toContain("wk ╾─────── 4%");
+		expect(line).toContain("mo ╾─────── 6%");
+	});
+
 	it("leaves a reset suffix without the ↺ marker as published", () => {
 		const statuses = new Map([["pi-quotas-usage", "5h: 34%"]]);
 		const built = build(statuses);
